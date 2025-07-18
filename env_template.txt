@@ -1,0 +1,13 @@
+SECRET_KEY=your-secret-key-here
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+USE_MYSQL=True
+DB_NAME=buildflow
+DB_USER=root
+DB_PASSWORD=Oumou@245
+DB_HOST=localhost
+DB_PORT=3306
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_STORAGE_BUCKET_NAME=your_bucket_name
+AWS_S3_REGION_NAME=us-east-1 
