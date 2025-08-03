@@ -1,6 +1,7 @@
-from django.urls import path
-from .views import PredictRiskView
+from rest_framework.routers import DefaultRouter
+from .views import AnalyticsDataViewSet
 
-urlpatterns = [
-    path('predict_risk/<int:projet_id>/', PredictRiskView.as_view(), name='predict_risk'),
-]
+router = DefaultRouter()
+router.register(r'analytics', AnalyticsDataViewSet, basename='analyticsdata')
+
+urlpatterns = router.urls

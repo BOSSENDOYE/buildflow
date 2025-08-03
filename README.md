@@ -20,11 +20,7 @@ BuildFlow est une application web Django complète pour la gestion de projets de
 - **Stockage cloud** avec AWS S3
 - **Organisation** par date et projet
 
-### 👥 Gestion des Utilisateurs
-- **Profils utilisateurs** avec rôles (Gestionnaire, Administrateur, Consultant)
-- **Authentification JWT** sécurisée
-- **Permissions** granulaires par projet
-
+###'
 ### 📊 Analytics et Rapports
 - **Statistiques** de projets en temps réel
 - **Suivi des risques** et alertes

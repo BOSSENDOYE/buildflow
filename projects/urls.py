@@ -1,19 +1,16 @@
-from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    ProjetViewSet, PhaseViewSet, BudgetViewSet, RisqueViewSet,
+    ProjetViewSet, RisqueViewSet, PhaseViewSet, BudgetViewSet,
     ActionViewSet, NotificationViewSet, CommentaireViewSet
 )
 
 router = DefaultRouter()
-router.register(r'projets', ProjetViewSet)
-router.register(r'phases', PhaseViewSet)
-router.register(r'budgets', BudgetViewSet)
-router.register(r'risques', RisqueViewSet)
-router.register(r'actions', ActionViewSet)
-router.register(r'notifications', NotificationViewSet)
-router.register(r'commentaires', CommentaireViewSet)
+router.register(r'projets', ProjetViewSet, basename='projet')
+router.register(r'risques', RisqueViewSet, basename='risque')
+router.register(r'phases', PhaseViewSet, basename='phase')
+router.register(r'budgets', BudgetViewSet, basename='budget')
+router.register(r'actions', ActionViewSet, basename='action')
+router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'commentaires', CommentaireViewSet, basename='commentaire')
 
-urlpatterns = [
-    path('', include(router.urls)),
-]
+urlpatterns = router.urls
