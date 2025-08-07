@@ -13,7 +13,7 @@ export interface UserProfile {
   last_name: string;
   profilutilisateur?: {
     id: number;
-    role: 'GESTIONNAIRE' | 'ADMINISTRATEUR' | 'CONSULTANT' | 'SUPERVISEUR' | 'OBSERVATEUR';
+    role: 'GESTIONNAIRE' | 'ADMINISTRATEUR' | 'CONSULTANT';
     permissions?: {
       peut_creer_projet: boolean;
       peut_modifier_projet: boolean;
@@ -38,6 +38,34 @@ export interface UserPermissions {
   peut_gerer_utilisateurs: boolean;
   peut_voir_analytics: boolean;
   peut_exporter_donnees: boolean;
+}
+
+export interface RoleInfo {
+  id: number;
+  name: string;
+  permissions: UserPermissions;
+}
+
+export interface RoleDetails {
+  display: string;
+  description: string;
+  permissions: string[];
+  features: string[];
+}
+
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+}
+
+export interface UpdateRoleResponse {
+  success: boolean;
+  message: string;
+  user?: User;
 }
 
 class AuthService {
@@ -70,7 +98,7 @@ class AuthService {
           },
         },
       };
-    } catch (error) {
+    } catch {
       throw new Error('Login failed. Please check your credentials.');
     }
   }
@@ -101,7 +129,7 @@ class AuthService {
           permissions: user.permissions,
         },
       };
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -124,7 +152,7 @@ class AuthService {
     }
   }
 
-  async getRolesInfo(): Promise<any> {
+  async getRolesInfo(): Promise<Record<string, RoleDetails>> {
     try {
       const response = await api.get('/users/roles/');
       return response.data;
@@ -134,7 +162,7 @@ class AuthService {
     }
   }
 
-  async listAllUsers(): Promise<any[]> {
+  async listAllUsers(): Promise<User[]> {
     try {
       const response = await api.get('/users/users/');
       return response.data;
@@ -144,7 +172,7 @@ class AuthService {
     }
   }
 
-  async updateUserRole(userId: number, newRole: string): Promise<any> {
+  async updateUserRole(userId: number, newRole: string): Promise<UpdateRoleResponse> {
     try {
       const response = await api.put(`/users/users/${userId}/role/`, {
         role: newRole
@@ -164,7 +192,7 @@ class AuthService {
     return localStorage.getItem('access_token');
   }
 
-  async register(credentials: { username: string; password: string; email: string; first_name: string; last_name: string }): Promise<AuthResponse> {
+  async register(credentials: { username: string; password: string; email: string; first_name: string; last_name: string; role: string }): Promise<AuthResponse> {
     try {
       // Register the user
       const response = await api.post('/users/register/', credentials);
@@ -190,7 +218,7 @@ class AuthService {
           },
         },
       };
-    } catch (error) {
+    } catch {
       throw new Error('Registration failed. Please check your information.');
     }
   }

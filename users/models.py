@@ -6,8 +6,6 @@ class ProfilUtilisateur(models.Model):
         ('GESTIONNAIRE', 'Gestionnaire de Projet'),
         ('ADMINISTRATEUR', 'Administrateur Système'),
         ('CONSULTANT', 'Consultant'),
-        ('SUPERVISEUR', 'Superviseur'),
-        ('OBSERVATEUR', 'Observateur Public'),
     )
     
     utilisateur = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -66,24 +64,7 @@ class ProfilUtilisateur(models.Model):
                 'peut_voir_analytics': True,
                 'peut_exporter_donnees': True,
             })
-        elif self.role == 'SUPERVISEUR':
-            permissions.update({
-                'peut_creer_projet': True,
-                'peut_modifier_projet': True,
-                'peut_supprimer_projet': False,
-                'peut_gerer_utilisateurs': False,
-                'peut_voir_analytics': True,
-                'peut_exporter_donnees': True,
-            })
-        elif self.role == 'OBSERVATEUR':
-            permissions.update({
-                'peut_creer_projet': False,
-                'peut_modifier_projet': False,
-                'peut_supprimer_projet': False,
-                'peut_gerer_utilisateurs': False,
-                'peut_voir_analytics': True,
-                'peut_exporter_donnees': False,
-            })
+
         
         return permissions
     

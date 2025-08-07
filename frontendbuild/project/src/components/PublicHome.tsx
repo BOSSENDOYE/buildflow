@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building2, MapPin, TrendingUp, Users, Calendar, CheckCircle2, AlertTriangle, Search, Filter, Mail, Phone, MessageCircle, ArrowRight, Globe, Shield, Zap, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import AuthService from '../services/authService';
+import InteractiveMap from './InteractiveMap';
 
 interface PublicProject {
   id: number;
@@ -16,73 +18,7 @@ interface PublicProject {
   longitude: number;
 }
 
-const mockPublicProjects: PublicProject[] = [
-  {
-    id: 1,
-    nom: "Résidence Almadies",
-    type: 'residence',
-    region: 'Dakar',
-    statut: 'EN_COURS',
-    progression: 65,
-    budget_prevue: 2500000000,
-    budget_reel: 2650000000,
-    date_fin_prevue: "2024-12-31",
-    latitude: 14.7167,
-    longitude: -17.4677
-  },
-  {
-    id: 2,
-    nom: "Centre Commercial Dakar City",
-    type: 'centre-commercial',
-    region: 'Dakar',
-    statut: 'EN_ATTENTE',
-    progression: 0,
-    budget_prevue: 8500000000,
-    budget_reel: 0,
-    date_fin_prevue: "2025-06-30",
-    latitude: 14.7167,
-    longitude: -17.4677
-  },
-  {
-    id: 3,
-    nom: "Pont de la Corniche",
-    type: 'pont',
-    region: 'Dakar',
-    statut: 'TERMINE',
-    progression: 100,
-    budget_prevue: 3200000000,
-    budget_reel: 3150000000,
-    date_fin_prevue: "2024-02-28",
-    latitude: 14.7167,
-    longitude: -17.4677
-  },
-  {
-    id: 4,
-    nom: "École Primaire Médina",
-    type: 'ecole',
-    region: 'Dakar',
-    statut: 'EN_COURS',
-    progression: 45,
-    budget_prevue: 1800000000,
-    budget_reel: 1750000000,
-    date_fin_prevue: "2024-08-15",
-    latitude: 14.7167,
-    longitude: -17.4677
-  },
-  {
-    id: 5,
-    nom: "Hôpital Régional Thiès",
-    type: 'hopital',
-    region: 'Thiès',
-    statut: 'EN_COURS',
-    progression: 80,
-    budget_prevue: 4500000000,
-    budget_reel: 4700000000,
-    date_fin_prevue: "2024-11-30",
-    latitude: 14.7833,
-    longitude: -16.9333
-  }
-];
+const mockPublicProjects: PublicProject[] = [];
 
 const PublicHome: React.FC = () => {
   const { login } = useAuth();
@@ -98,12 +34,15 @@ const PublicHome: React.FC = () => {
     confirmPassword: '', 
     email: '', 
     first_name: '', 
-    last_name: '' 
+    last_name: '',
+    role: 'GESTIONNAIRE'
   });
   const [loginError, setLoginError] = useState('');
   const [registerError, setRegisterError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [rolesInfo, setRolesInfo] = useState<Record<string, any>>({});
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -142,6 +81,26 @@ const PublicHome: React.FC = () => {
       default: return statut;
     }
   };
+
+  const loadRolesInfo = async () => {
+    if (Object.keys(rolesInfo).length === 0) {
+      setIsLoadingRoles(true);
+      try {
+        const roles = await AuthService.getRolesInfo();
+        setRolesInfo(roles);
+      } catch (error) {
+        console.error('Erreur lors du chargement des informations des rôles:', error);
+      } finally {
+        setIsLoadingRoles(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (showRegisterForm) {
+      loadRolesInfo();
+    }
+  }, [showRegisterForm]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,6 +148,7 @@ const PublicHome: React.FC = () => {
           email: registerCredentials.email,
           first_name: registerCredentials.first_name,
           last_name: registerCredentials.last_name,
+          role: registerCredentials.role,
         }),
       });
 
@@ -207,7 +167,8 @@ const PublicHome: React.FC = () => {
           confirmPassword: '', 
           email: '', 
           first_name: '', 
-          last_name: '' 
+          last_name: '',
+          role: 'GESTIONNAIRE'
         });
         
         // Recharger la page pour mettre à jour l'état d'authentification
@@ -566,18 +527,22 @@ const PublicHome: React.FC = () => {
         </div>
       </div>
 
-      {/* Carte placeholder */}
+      {/* Carte Interactive */}
       <div className="bg-white rounded-xl border border-gray-200 p-8">
-        <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-          <div className="text-center">
-            <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">Carte Interactive</h3>
-            <p className="text-gray-500 mb-4">Intégration avec une API de cartographie (Google Maps, OpenStreetMap)</p>
-            <div className="text-sm text-gray-400">
-              {filteredProjects.length} projet(s) trouvé(s)
-            </div>
-          </div>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Carte Interactive des Projets</h3>
+          <p className="text-sm text-gray-600">
+            Cliquez sur les marqueurs pour voir les détails des projets
+          </p>
         </div>
+        <InteractiveMap 
+          projects={filteredProjects}
+          onProjectClick={(project) => {
+            console.log('Projet cliqué:', project);
+            // Ici vous pouvez ajouter une logique pour afficher plus de détails
+          }}
+          className="h-96 w-full"
+        />
       </div>
 
       {/* Liste des projets filtrés */}
@@ -912,6 +877,73 @@ const PublicHome: React.FC = () => {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Type de compte
+                </label>
+                <select
+                  value={registerCredentials.role}
+                  onChange={(e) => setRegisterCredentials({ ...registerCredentials, role: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="GESTIONNAIRE">Gestionnaire de Projet</option>
+                  <option value="ADMINISTRATEUR">Administrateur Système</option>
+                  <option value="CONSULTANT">Consultant</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Choisissez le type de compte qui correspond le mieux à vos besoins
+                </p>
+                
+                {/* Informations sur les types de compte */}
+                {isLoadingRoles ? (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-sm text-blue-600">Chargement des informations...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-blue-900 mb-3">Informations sur les types de compte :</h4>
+                    <div className="space-y-3">
+                      {Object.entries(rolesInfo).map(([roleKey, roleInfo]) => (
+                        <div key={roleKey} className={`p-3 rounded-lg border ${registerCredentials.role === roleKey ? 'border-blue-300 bg-blue-100' : 'border-gray-200 bg-white'}`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h5 className="text-sm font-medium text-blue-900">{roleInfo.display}</h5>
+                              <p className="text-xs text-blue-700 mt-1">{roleInfo.description}</p>
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-blue-800 mb-1">Fonctionnalités :</p>
+                                <ul className="text-xs text-blue-700 space-y-1">
+                                  {roleInfo.features?.map((feature: string, index: number) => (
+                                    <li key={index} className="flex items-center">
+                                      <span className="w-1 h-1 bg-blue-500 rounded-full mr-2"></span>
+                                      {feature}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setRegisterCredentials({ ...registerCredentials, role: roleKey })}
+                              className={`ml-3 px-3 py-1 text-xs rounded-full border ${
+                                registerCredentials.role === roleKey
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-white text-blue-600 border-blue-300 hover:bg-blue-50'
+                              }`}
+                            >
+                              Choisir
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

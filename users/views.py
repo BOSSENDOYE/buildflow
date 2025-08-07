@@ -41,6 +41,13 @@ def register_user(request):
         last_name = request.data.get('last_name', '')
         role = request.data.get('role', 'GESTIONNAIRE')  # Rôle par défaut
 
+        # Validation du rôle
+        valid_roles = ['GESTIONNAIRE', 'ADMINISTRATEUR', 'CONSULTANT']
+        if role not in valid_roles:
+            return Response({
+                'message': 'Rôle invalide. Veuillez choisir un rôle valide.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         # Validation des données
         if not username or not password or not email:
             return Response({
@@ -199,7 +206,7 @@ def update_user_role(request, user_id):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])  # Permettre l'accès public pour l'inscription
 def get_roles_info(request):
     """
     Récupérer les informations sur les rôles disponibles
@@ -208,27 +215,37 @@ def get_roles_info(request):
         'GESTIONNAIRE': {
             'display': 'Gestionnaire de Projet',
             'description': 'Peut créer et gérer des projets, voir les analytics',
-            'permissions': ['peut_creer_projet', 'peut_modifier_projet', 'peut_voir_analytics', 'peut_exporter_donnees']
+            'permissions': ['peut_creer_projet', 'peut_modifier_projet', 'peut_voir_analytics', 'peut_exporter_donnees'],
+            'features': [
+                'Créer et gérer des projets',
+                'Modifier les détails des projets',
+                'Voir les analytics et statistiques',
+                'Exporter les données'
+            ]
         },
         'ADMINISTRATEUR': {
             'display': 'Administrateur Système',
             'description': 'Accès complet à toutes les fonctionnalités',
-            'permissions': ['peut_creer_projet', 'peut_modifier_projet', 'peut_supprimer_projet', 'peut_gerer_utilisateurs', 'peut_voir_analytics', 'peut_exporter_donnees']
+            'permissions': ['peut_creer_projet', 'peut_modifier_projet', 'peut_supprimer_projet', 'peut_gerer_utilisateurs', 'peut_voir_analytics', 'peut_exporter_donnees'],
+            'features': [
+                'Créer et gérer des projets',
+                'Modifier et supprimer des projets',
+                'Gérer tous les utilisateurs',
+                'Voir les analytics et statistiques',
+                'Exporter les données',
+                'Accès complet au système'
+            ]
         },
         'CONSULTANT': {
             'display': 'Consultant',
-            'description': 'Peut consulter les projets et analytics',
-            'permissions': ['peut_voir_analytics', 'peut_exporter_donnees']
-        },
-        'SUPERVISEUR': {
-            'display': 'Superviseur',
-            'description': 'Peut créer et modifier des projets, superviser les équipes',
-            'permissions': ['peut_creer_projet', 'peut_modifier_projet', 'peut_voir_analytics', 'peut_exporter_donnees']
-        },
-        'OBSERVATEUR': {
-            'display': 'Observateur Public',
-            'description': 'Accès en lecture seule aux projets publics',
-            'permissions': ['peut_voir_analytics']
+            'description': 'Peut consulter les projets et analytics en lecture seule',
+            'permissions': ['peut_voir_analytics', 'peut_exporter_donnees'],
+            'features': [
+                'Consulter tous les projets',
+                'Voir les analytics et statistiques',
+                'Exporter les données',
+                'Accès en lecture seule'
+            ]
         }
     }
     

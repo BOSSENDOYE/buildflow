@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Building2, Users, Calendar, TrendingUp, FileText, AlertTriangle, CheckCircle2, Clock, DollarSign, Menu, X, Bell, Search, Plus, Filter, Download, Eye, Edit, Trash2, Settings, LogOut, Shield, Zap, Brain, Target, BarChart3, Activity, Lightbulb, ArrowRight, Globe } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import projectService, { Project } from '../services/projectService';
+import authService from '../services/authService';
+import ProjectModals from './ProjectModals';
+import UserProfileManager from './UserProfileManager';
+import UserSettings from './UserSettings';
+import NotificationsModal from './NotificationsModal';
 
 interface Alert {
   id: number;
@@ -24,123 +29,51 @@ interface Recommendation {
   date: string;
 }
 
-const mockAlerts: Alert[] = [
-  {
-    id: 1,
-    type: 'retard',
-    titre: "Retard critique détecté",
-    description: "Le projet Résidence Les Jardins accuse un retard de 15 jours sur la phase de fondations",
-    projet: "Résidence Les Jardins",
-    date: "2024-01-15",
-    priorite: 'critique',
-    isRead: false
-  },
-  {
-    id: 2,
-    type: 'depassement',
-    titre: "Dépassement budget",
-    description: "Dépassement de 6% sur le budget prévisionnel du projet Centre Commercial Le Forum",
-    projet: "Centre Commercial Le Forum",
-    date: "2024-01-14",
-    priorite: 'elevee',
-    isRead: false
-  },
-  {
-    id: 3,
-    type: 'anomalie',
-    titre: "Anomalie détectée",
-    description: "Incohérence détectée dans les données de progression du projet Pont de la Rivière",
-    projet: "Pont de la Rivière",
-    date: "2024-01-13",
-    priorite: 'moyenne',
-    isRead: true
-  }
-];
-
-const mockRecommendations: Recommendation[] = [
-  {
-    id: 1,
-    type: 'optimisation',
-    titre: "Optimisation des ressources",
-    description: "Considérer l'embauche de 2 ouvriers supplémentaires pour accélérer la phase de fondations",
-    impact: 'eleve',
-    projet: "Résidence Les Jardins",
-    date: "2024-01-15"
-  },
-  {
-    id: 2,
-    type: 'risque',
-    titre: "Gestion des risques",
-    description: "Renforcer les mesures de sécurité sur le chantier du Centre Commercial Le Forum",
-    impact: 'moyen',
-    projet: "Centre Commercial Le Forum",
-    date: "2024-01-14"
-  },
-  {
-    id: 3,
-    type: 'efficacite',
-    titre: "Amélioration de l'efficacité",
-    description: "Implémenter un système de suivi quotidien pour améliorer la productivité",
-    impact: 'eleve',
-    date: "2024-01-13"
-  }
-];
+const mockAlerts: Alert[] = [];
+const mockRecommendations: Recommendation[] = [];
 
 const PrivateDashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const [activeView, setActiveView] = useState<'dashboard' | 'projects' | 'phases' | 'documents' | 'analytics'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'projects' | 'phases' | 'documents' | 'analytics' | 'users'>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [projects, setProjects] = useState<Project[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
   const [recommendations, setRecommendations] = useState<Recommendation[]>(mockRecommendations);
   const [isLoading, setIsLoading] = useState(true);
+  const [userPermissions, setUserPermissions] = useState<any>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  
+
 
   useEffect(() => {
-    const loadProjects = async () => {
+    const loadData = async () => {
       try {
         setIsLoading(true);
+        
+        // Charger les permissions utilisateur
+        const permissions = await authService.getUserPermissions();
+        setUserPermissions(permissions);
+        
+        // Charger les projets
         const projectsData = await projectService.getProjects();
         setProjects(projectsData);
       } catch (error) {
-        console.error('Error loading projects:', error);
-        // For development, use mock data if API is not available
-        setProjects([
-          {
-            id: 1,
-            nom: "Résidence Les Jardins",
-            description: "Construction d'une résidence de 50 appartements avec espaces verts",
-            statut: 'EN_COURS',
-            budget_prevue: 2500000,
-            budget_reel: 2650000,
-            date_debut: "2024-01-15",
-            date_fin_prevue: "2024-12-31",
-            chef_projet: 1,
-            membres: [1, 2, 3],
-            date_creation: "2024-01-15T00:00:00Z",
-            date_modification: "2024-01-15T00:00:00Z"
-          },
-          {
-            id: 2,
-            nom: "Centre Commercial Le Forum",
-            description: "Développement d'un centre commercial de 15 000 m²",
-            statut: 'EN_ATTENTE',
-            budget_prevue: 8500000,
-            budget_reel: 0,
-            date_debut: "2024-03-01",
-            date_fin_prevue: "2025-06-30",
-            chef_projet: 2,
-            membres: [1, 2, 4],
-            date_creation: "2024-03-01T00:00:00Z",
-            date_modification: "2024-03-01T00:00:00Z"
-          }
-        ]);
+        console.error('Error loading data:', error);
+        // En cas d'erreur, on garde les listes vides
+        setProjects([]);
+        setUserPermissions(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadProjects();
+    loadData();
   }, []);
 
   const getStatusColor = (statut: string) => {
@@ -204,6 +137,131 @@ const PrivateDashboard: React.FC = () => {
     }
   };
 
+  const handleCreateProjectClick = () => {
+    if (userPermissions?.peut_creer_projet) {
+      setShowCreateModal(true);
+    } else {
+      alert('Vous n\'avez pas les permissions pour créer un projet.');
+    }
+  };
+
+  const handleEditProjectClick = (project: Project) => {
+    if (userPermissions?.peut_modifier_projet) {
+      setSelectedProject(project);
+      setShowEditModal(true);
+    } else {
+      alert('Vous n\'avez pas les permissions pour modifier ce projet.');
+    }
+  };
+
+  const handleDeleteProjectClick = (project: Project) => {
+    if (userPermissions?.peut_supprimer_projet) {
+      setSelectedProject(project);
+      setShowDeleteModal(true);
+    } else {
+      alert('Vous n\'avez pas les permissions pour supprimer ce projet.');
+    }
+  };
+
+  const handleViewProject = (project: Project) => {
+    // Navigation vers la page de détail du projet
+    console.log('Voir le projet:', project);
+    // Ici vous pouvez implémenter la navigation
+  };
+
+  const handleExportData = () => {
+    if (userPermissions?.peut_exporter_donnees) {
+      // Logique d'export des données
+      console.log('Export des données...');
+      
+      // Créer un fichier CSV avec les données des projets
+      const csvContent = [
+        ['Nom', 'Description', 'Statut', 'Budget Réel', 'Budget Prévu', 'Date de fin'],
+        ...projects.map(project => [
+          project.nom,
+          project.description,
+          project.statut,
+          project.budget_reel?.toString() || '0',
+          project.budget_prevue?.toString() || '0',
+          project.date_fin_prevue
+        ])
+      ].map(row => row.join(',')).join('\n');
+      
+      // Créer et télécharger le fichier
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `projets_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert('Export terminé avec succès !');
+    } else {
+      alert('Vous n\'avez pas les permissions pour exporter les données.');
+    }
+  };
+
+  const handleSettingsClick = () => {
+    setShowSettingsModal(true);
+  };
+
+  const handleNotificationsClick = () => {
+    setShowNotificationsModal(true);
+  };
+
+  const handleMarkAlertAsRead = (alertId: number) => {
+    setAlerts(prev => prev.map(alert => 
+      alert.id === alertId ? { ...alert, isRead: true } : alert
+    ));
+  };
+
+  const handleViewAllProjects = () => {
+    // Navigation vers la page des projets
+    setActiveView('projects');
+  };
+
+  const handleCreateProject = async (projectData: Partial<Project>) => {
+    try {
+      const newProject = await projectService.createProject(projectData);
+      setProjects(prev => [...prev, newProject]);
+      setShowCreateModal(false);
+    } catch (error) {
+      console.error('Error creating project:', error);
+      throw error;
+    }
+  };
+
+  const handleEditProject = async (projectData: Partial<Project>) => {
+    if (!selectedProject) return;
+    
+    try {
+      const updatedProject = await projectService.updateProject(selectedProject.id, projectData);
+      setProjects(prev => prev.map(p => p.id === selectedProject.id ? updatedProject : p));
+      setShowEditModal(false);
+      setSelectedProject(null);
+    } catch (error) {
+      console.error('Error updating project:', error);
+      throw error;
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!selectedProject) return;
+    
+    try {
+      await projectService.deleteProject(selectedProject.id);
+      setProjects(prev => prev.filter(p => p.id !== selectedProject.id));
+      setShowDeleteModal(false);
+      setSelectedProject(null);
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      throw error;
+    }
+  };
+
   const renderDashboard = () => (
     <div className="space-y-8">
       {/* En-tête personnalisé */}
@@ -215,10 +273,25 @@ const PrivateDashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
-          <button className="bg-amber-700 text-white px-4 py-2 rounded-lg hover:bg-amber-800 transition-colors font-medium flex items-center space-x-2">
-            <Plus className="h-4 w-4" />
-            <span>Nouveau Projet</span>
-          </button>
+          {userPermissions?.peut_creer_projet && (
+            <button 
+              onClick={handleCreateProjectClick}
+              className="bg-amber-700 text-white px-4 py-2 rounded-lg hover:bg-amber-800 transition-colors font-medium flex items-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nouveau Projet</span>
+            </button>
+          )}
+
+          {userPermissions?.peut_exporter_donnees && (
+            <button 
+              onClick={handleExportData}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center space-x-2"
+            >
+              <Download className="h-4 w-4" />
+              <span>Exporter</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -308,7 +381,10 @@ const PrivateDashboard: React.FC = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-semibold text-gray-900">Mes Projets</h3>
-            <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+            <button 
+              onClick={handleViewAllProjects}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            >
               Voir tous
             </button>
           </div>
@@ -407,10 +483,15 @@ const PrivateDashboard: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Mes Projets</h1>
           <p className="text-gray-600 mt-2">Gérez vos projets de construction</p>
         </div>
-        <button className="mt-4 sm:mt-0 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2">
-          <Plus className="h-4 w-4" />
-          <span>Nouveau Projet</span>
-        </button>
+        {userPermissions?.peut_creer_projet && (
+                      <button 
+              onClick={handleCreateProjectClick}
+              className="mt-4 sm:mt-0 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nouveau Projet</span>
+            </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -474,15 +555,31 @@ const PrivateDashboard: React.FC = () => {
                   <td className="py-4 px-6 text-gray-900">{formatDate(project.date_fin_prevue)}</td>
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-2">
-                      <button className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors">
+                      <button 
+                        onClick={() => handleViewProject(project)}
+                        className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors"
+                        title="Voir le projet"
+                      >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button className="text-gray-600 hover:text-gray-800 p-1 rounded transition-colors">
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button className="text-red-600 hover:text-red-800 p-1 rounded transition-colors">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {userPermissions?.peut_modifier_projet && (
+                        <button 
+                          onClick={() => handleEditProjectClick(project)}
+                          className="text-gray-600 hover:text-gray-800 p-1 rounded transition-colors"
+                          title="Modifier le projet"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      )}
+                      {userPermissions?.peut_supprimer_projet && (
+                        <button 
+                          onClick={() => handleDeleteProjectClick(project)}
+                          className="text-red-600 hover:text-red-800 p-1 rounded transition-colors"
+                          title="Supprimer le projet"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -500,7 +597,8 @@ const PrivateDashboard: React.FC = () => {
       case 'projects': return renderProjects();
       case 'phases': return <div>Phases à venir...</div>;
       case 'documents': return <div>Documents à venir...</div>;
-      case 'analytics': return <div>Analytics à venir...</div>;
+      case 'analytics': return userPermissions?.peut_voir_analytics ? <div>Analytics à venir...</div> : <div>Vous n'avez pas accès aux analytics.</div>;
+      case 'users': return userPermissions?.peut_gerer_utilisateurs ? <UserProfileManager /> : <div>Vous n'avez pas accès à la gestion des utilisateurs.</div>;
       default: return renderDashboard();
     }
   };
@@ -541,7 +639,8 @@ const PrivateDashboard: React.FC = () => {
               { id: 'projects', label: 'Mes Projets', icon: Building2 },
               { id: 'phases', label: 'Phases', icon: Calendar },
               { id: 'documents', label: 'Documents', icon: FileText },
-              { id: 'analytics', label: 'Analytics', icon: BarChart3 }
+              ...(userPermissions?.peut_voir_analytics ? [{ id: 'analytics', label: 'Analytics', icon: BarChart3 }] : []),
+              ...(userPermissions?.peut_gerer_utilisateurs ? [{ id: 'users', label: 'Utilisateurs', icon: Users }] : [])
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -578,9 +677,14 @@ const PrivateDashboard: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+              <button 
+                onClick={handleSettingsClick}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Paramètres"
+              >
                 <Settings className="h-4 w-4" />
               </button>
+
               <button 
                 onClick={handleLogout}
                 className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
@@ -616,7 +720,11 @@ const PrivateDashboard: React.FC = () => {
             <span className="text-lg font-bold text-gray-900">BuildFlow</span>
           </div>
           <div className="flex items-center space-x-2">
-            <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors relative">
+            <button 
+              onClick={handleNotificationsClick}
+              className="p-2 text-gray-400 hover:text-gray-600 transition-colors relative"
+              title="Notifications"
+            >
               <Bell className="h-5 w-5" />
               {unreadAlerts.length > 0 && (
                 <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
@@ -648,6 +756,48 @@ const PrivateDashboard: React.FC = () => {
           aria-label="Fermer le menu"
         ></div>
       )}
+
+      {/* Modales */}
+      <ProjectModals
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateProject}
+        mode="create"
+      />
+      
+      <ProjectModals
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedProject(null);
+        }}
+        onSubmit={handleEditProject}
+        project={selectedProject}
+        mode="edit"
+      />
+      
+      <ProjectModals
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setSelectedProject(null);
+        }}
+        onSubmit={handleDeleteProject}
+        project={selectedProject}
+        mode="delete"
+      />
+      
+      <UserSettings
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+      />
+      
+      <NotificationsModal
+        isOpen={showNotificationsModal}
+        onClose={() => setShowNotificationsModal(false)}
+        alerts={alerts}
+        onMarkAsRead={handleMarkAlertAsRead}
+      />
     </div>
   );
 };
