@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, CheckCircle, Plus } from 'lucide-react';
 import { Project } from '../services/projectService';
+import authService, { User } from '../services/authService';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
   mode
 }) => {
   const modalRef = React.useRef<HTMLDivElement>(null);
+  const [users, setUsers] = useState<User[]>([]);
 
   // Gestion du focus et de l'accessibilité
   React.useEffect(() => {
@@ -49,13 +51,33 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
       document.body.style.overflow = 'unset';
     };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    let mounted = true;
+    // Essaye de charger la liste des utilisateurs (admin requis). En cas d'échec, on ignore.
+    authService
+      .listAllUsers()
+      .then((list) => {
+        if (mounted) setUsers(list || []);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const [formData, setFormData] = useState({
     nom: project?.nom || '',
     description: project?.description || '',
     date_debut: project?.date_debut ? project.date_debut.split('T')[0] : '',
     date_fin_prevue: project?.date_fin_prevue ? project.date_fin_prevue.split('T')[0] : '',
     budget_prevue: project?.budget_prevue || 0,
-    statut: project?.statut || 'EN_ATTENTE'
+    statut: project?.statut || 'EN_ATTENTE',
+    // nouveaux champs
+    nom_entreprise: (project as any)?.nom_entreprise || '',
+    latitude: (project as any)?.latitude ?? undefined,
+    longitude: (project as any)?.longitude ?? undefined,
+    chef_projet: project?.chef_projet || undefined,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -73,7 +95,9 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
           ...formData,
           budget_prevue: Number(formData.budget_prevue),
           membres: project?.membres || [],
-          chef_projet: project?.chef_projet || 1
+          chef_projet: formData.chef_projet ? Number(formData.chef_projet) : undefined,
+          latitude: formData.latitude !== undefined && formData.latitude !== null && (formData.latitude as any) !== '' ? Number(formData.latitude) : undefined,
+          longitude: formData.longitude !== undefined && formData.longitude !== null && (formData.longitude as any) !== '' ? Number(formData.longitude) : undefined,
         });
       }
       onClose();
@@ -226,21 +250,78 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Statut initial
-            </label>
-            <select
-              name="statut"
-              value={formData.statut}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="EN_ATTENTE">En attente</option>
-              <option value="EN_COURS">En cours</option>
-              <option value="TERMINE">Terminé</option>
-              <option value="ANNULE">Annulé</option>
-            </select>
+          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">👤 Chef de projet et Entreprise</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-base font-medium text-gray-700 mb-2">Chef de projet</label>
+                {users && users.length > 0 ? (
+                  <select
+                    name="chef_projet"
+                    value={formData.chef_projet ?? ''}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                  >
+                    <option value="">(Moi ou sélectionnez)</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}`.trim() : u.username} (#{u.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="number"
+                    name="chef_projet"
+                    value={formData.chef_projet ?? ''}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                    placeholder="ID utilisateur (optionnel)"
+                  />
+                )}
+              </div>
+              <div>
+                <label className="block text-base font-medium text-gray-700 mb-2">Nom de l’entreprise</label>
+                <input
+                  type="text"
+                  name="nom_entreprise"
+                  value={formData.nom_entreprise}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                  placeholder="Ex: Entreprise ABC"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">📍 Géolocalisation</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-base font-medium text-gray-700 mb-2">Latitude</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  name="latitude"
+                  value={formData.latitude ?? ''}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                  placeholder="14.6937"
+                />
+              </div>
+              <div>
+                <label className="block text-base font-medium text-gray-700 mb-2">Longitude</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  name="longitude"
+                  value={formData.longitude ?? ''}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                  placeholder="-17.4441"
+                />
+              </div>
+            </div>
           </div>
 
           {error && (

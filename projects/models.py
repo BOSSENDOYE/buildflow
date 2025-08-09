@@ -17,6 +17,10 @@ class Projet(models.Model):
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='EN_COURS')
     budget_prevue = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     budget_reel = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    # Nouvelles informations demandées
+    nom_entreprise = models.CharField(max_length=255, blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     chef_projet = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='projets_diriges')
     membres = models.ManyToManyField(User, related_name='projets_participes', blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
