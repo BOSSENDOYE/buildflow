@@ -173,3 +173,29 @@ class Commentaire(models.Model):
         verbose_name = "Commentaire"
         verbose_name_plural = "Commentaires"
         ordering = ['-date_creation'] 
+
+
+# --- Traçabilité / Journal d'audit ---
+class AuditLog(models.Model):
+    ACTION_CHOICES = (
+        ('CREATE', 'CREATE'),
+        ('UPDATE', 'UPDATE'),
+        ('DELETE', 'DELETE'),
+    )
+
+    utilisateur = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    resource_type = models.CharField(max_length=100)
+    resource_id = models.PositiveIntegerField()
+    resource_repr = models.TextField()
+    before = models.JSONField(null=True, blank=True)
+    after = models.JSONField(null=True, blank=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Audit"
+        verbose_name_plural = "Audits"
+        ordering = ['-date_creation']
+
+    def __str__(self):
+        return f"{self.date_creation} {self.action} {self.resource_type}#{self.resource_id}"

@@ -10,20 +10,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-interface Project {
-  id: number;
-  nom: string;
-  type: 'route' | 'ecole' | 'hopital' | 'pont' | 'residence' | 'centre-commercial';
-  region: string;
-  statut: 'EN_COURS' | 'TERMINE' | 'EN_ATTENTE';
-  progression: number;
-  budget_prevue: number;
-  budget_reel: number;
-  date_fin_prevue: string;
-  latitude: number;
-  longitude: number;
-}
-
 interface Region {
   id: string;
   nom: string;
@@ -31,22 +17,16 @@ interface Region {
   bounds: L.LatLngBounds;
 }
 
-interface InteractiveMapProps {
-  projects: Project[];
-  onProjectClick?: (project: Project) => void;
+interface SenegalMapProps {
   className?: string;
 }
 
-const InteractiveMap: React.FC<InteractiveMapProps> = ({ 
-  projects, 
-  onProjectClick, 
+const SenegalMap: React.FC<SenegalMapProps> = ({ 
   className = "h-96 w-full" 
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<L.Marker[]>([]);
-  const regionsRef = useRef<L.GeoJSON | null>(null);
-  const selectedRegionRef = useRef<string | null>(null);
+  const regionsRef = useRef<L.Rectangle[]>([]);
   
   const [selectedRegion, setSelectedRegion] = useState<string>('');
 
@@ -147,7 +127,6 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     // Mettre à jour la sélection
     setSelectedRegion(regionId);
-    selectedRegionRef.current = regionId;
 
     // Zoom sur la région
     mapInstanceRef.current.fitBounds(region.bounds, { padding: [20, 20] });
@@ -158,26 +137,23 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Fonction pour mettre à jour les styles des régions
   const updateRegionStyles = () => {
-    if (!regionsRef.current) return;
+    regionsRef.current.forEach((polygon, index) => {
+      const region = regions[index];
+      const isSelected = region.id === selectedRegion;
 
-    regionsRef.current.setStyle((feature) => {
-      const regionId = feature.properties?.id;
-      const isSelected = regionId === selectedRegionRef.current;
-
-      return {
+      polygon.setStyle({
         fillColor: isSelected ? '#3B82F6' : '#10B981',
         weight: isSelected ? 3 : 1,
         opacity: isSelected ? 1 : 0.7,
         color: isSelected ? '#1D4ED8' : '#059669',
         fillOpacity: isSelected ? 0.3 : 0.1
-      };
+      });
     });
   };
 
   // Gestionnaire de clic sur une région
   const handleRegionClick = (regionId: string) => {
     setSelectedRegion(regionId);
-    selectedRegionRef.current = regionId;
     updateRegionStyles();
   };
 
@@ -221,6 +197,9 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     // Ajouter tous les polygones à la carte
     regionPolygons.forEach(polygon => polygon.addTo(map));
+    
+    // Sauvegarder les références
+    regionsRef.current = regionPolygons;
 
     // Sauvegarder l'instance de la carte
     mapInstanceRef.current = map;
@@ -234,81 +213,10 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, []);
 
-  // Mettre à jour les marqueurs quand les projets changent
+  // Mettre à jour les styles quand la sélection change
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
-
-    // Supprimer les anciens marqueurs
-    markersRef.current.forEach(marker => marker.remove());
-    markersRef.current = [];
-
-    // Créer les icônes personnalisées pour chaque type de projet
-    const createCustomIcon = (type: string) => {
-      const colors = {
-        'route': '#FF6B35',
-        'ecole': '#4ECDC4',
-        'hopital': '#FFE66D',
-        'pont': '#95E1D3',
-        'residence': '#F38181',
-        'centre-commercial': '#A8E6CF'
-      };
-
-      return L.divIcon({
-        className: 'custom-marker',
-        html: `
-          <div style="
-            background-color: ${colors[type as keyof typeof colors] || '#666'};
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            border: 3px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 12px;
-          ">
-            ${type.charAt(0).toUpperCase()}
-          </div>
-        `,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
-      });
-    };
-
-    // Ajouter les marqueurs pour chaque projet
-    projects.forEach(project => {
-      if (project.latitude && project.longitude) {
-        const marker = L.marker([project.latitude, project.longitude], {
-          icon: createCustomIcon(project.type)
-        }).addTo(mapInstanceRef.current!);
-
-        // Ajouter un popup avec les informations du projet
-        const popupContent = `
-          <div class="p-2">
-            <h3 class="font-bold text-lg mb-2">${project.nom}</h3>
-            <p class="text-sm text-gray-600 mb-1"><strong>Type:</strong> ${project.type}</p>
-            <p class="text-sm text-gray-600 mb-1"><strong>Région:</strong> ${project.region}</p>
-            <p class="text-sm text-gray-600 mb-1"><strong>Statut:</strong> ${project.statut}</p>
-            <p class="text-sm text-gray-600 mb-1"><strong>Progression:</strong> ${project.progression}%</p>
-            <p class="text-sm text-gray-600 mb-1"><strong>Budget:</strong> ${project.budget_prevue.toLocaleString()} FCFA</p>
-          </div>
-        `;
-        marker.bindPopup(popupContent);
-
-        // Gestionnaire de clic sur le marqueur
-        marker.on('click', () => {
-          if (onProjectClick) {
-            onProjectClick(project);
-          }
-        });
-
-        markersRef.current.push(marker);
-      }
-    });
-  }, [projects, onProjectClick]);
+    updateRegionStyles();
+  }, [selectedRegion]);
 
   return (
     <div className="space-y-4">
@@ -355,14 +263,13 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
             <div className="w-3 h-3 bg-blue-500 rounded"></div>
             <span>Région sélectionnée</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-orange-500 rounded"></div>
-            <span>Projets</span>
-          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default InteractiveMap; 
+export default SenegalMap;
+
+
+

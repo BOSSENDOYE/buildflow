@@ -1,3 +1,6 @@
+"""
+Enhanced analytics views with improved ML model integration
+"""
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
@@ -5,15 +8,10 @@ from rest_framework.response import Response
 from django.db.models import Sum, Count, Q
 from datetime import date
 import math
-from ml.inference import predict_from_input
-try:
-    import pandas as pd  # type: ignore
-    from sklearn.linear_model import LogisticRegression, LinearRegression  # type: ignore
-except Exception:  # pragma: no cover
-    pd = None
-    LogisticRegression = None
-    LinearRegression = None
+import warnings
+warnings.filterwarnings('ignore')
 
+from ml.inference import predict_from_input
 from projects.models import Projet, Phase, Budget, Risque
 from .models import AnalyticsData
 from .serializers import AnalyticsDataSerializer
@@ -23,8 +21,8 @@ class AnalyticsDataViewSet(viewsets.ModelViewSet):
     serializer_class = AnalyticsDataSerializer
     permission_classes = [IsAuthenticated]
 
-
 def _aggregate_project_features(projet: Projet) -> dict:
+    """Aggregate project features for ML prediction"""
     # Durées
     planned_days = (projet.date_fin_prevue - projet.date_debut).days
     today = date.today()
@@ -57,9 +55,8 @@ def _aggregate_project_features(projet: Projet) -> dict:
         'statut': projet.statut,
     }
 
-
 def _rule_based_delay_probability(f: dict) -> float:
-    # Heuristique simple: plus on a de jours écoulés vs prévu et peu de progrès, plus le risque augmente
+    """Heuristic rule-based delay probability calculation"""
     time_pressure = 0.0
     if f['planned_days'] > 0:
         time_pressure = f['days_elapsed'] / max(1, f['planned_days'])
@@ -67,17 +64,16 @@ def _rule_based_delay_probability(f: dict) -> float:
     risk_factor = min(1.0, 0.5 * time_pressure + 0.4 * low_progress_penalty + 0.1 * (f['nb_risques'] > 0))
     return round(risk_factor, 3)
 
-
 def _rule_based_budget_overrun_probability(f: dict) -> float:
-    # Heuristique: si ratio budget > progression, risque augmente
+    """Heuristic rule-based budget overrun probability calculation"""
     gap = max(0.0, f['budget_ratio'] - max(0.01, f['progress_ratio']))
     risk = min(1.0, 0.6 * gap + 0.2 * (f['nb_risques'] > 0) + 0.2 * (f['days_left'] < 0))
     return round(risk, 3)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def predict_delay(request):
+def predict_delay_enhanced(request):
+    """Enhanced delay prediction endpoint"""
     projet_id = request.query_params.get('projet')
     if not projet_id:
         return Response({'detail': 'Paramètre "projet" requis'}, status=status.HTTP_400_BAD_REQUEST)
@@ -87,42 +83,8 @@ def predict_delay(request):
         return Response({'detail': 'Projet introuvable'}, status=status.HTTP_404_NOT_FOUND)
 
     features = _aggregate_project_features(projet)
-    # Utiliser modèle ML si disponible; fallback heuristique
-    try:
-        ml = predict_from_input(
-            progress_percent=max(0.0, min(100.0, features['progress_ratio'] * 100)),
-            budget_spent=max(0.0, min(100.0, features['budget_ratio'] * 100)),
-            weather=1,  # TODO: brancher une vraie source météo
-            incidents=int(features['nb_risques'] or 0),
-        )
-        return Response({
-            'project_id': projet.id,
-            'delay_risk_probability': round((ml['delay_probability'] or 0)/100.0, 3),
-            'budget_overrun_probability': round((ml['budget_overrun_estimate'] or 0)/100.0, 3),
-            'recommendations': ml['recommendations'],
-            'features': features,
-        })
-    except Exception:
-        prob = _rule_based_delay_probability(features)
-        return Response({
-            'project_id': projet.id,
-            'delay_risk_probability': prob,
-            'features': features,
-        })
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def predict_budget_overrun(request):
-    projet_id = request.query_params.get('projet')
-    if not projet_id:
-        return Response({'detail': 'Paramètre "projet" requis'}, status=status.HTTP_400_BAD_REQUEST)
-    try:
-        projet = Projet.objects.get(id=projet_id)
-    except Projet.DoesNotExist:
-        return Response({'detail': 'Projet introuvable'}, status=status.HTTP_404_NOT_FOUND)
-
-    features = _aggregate_project_features(projet)
+    
+    # Use ML models if available, fallback to heuristics
     try:
         ml = predict_from_input(
             progress_percent=max(0.0, min(100.0, features['progress_ratio'] * 100)),
@@ -130,24 +92,26 @@ def predict_budget_overrun(request):
             weather=1,
             incidents=int(features['nb_risques'] or 0),
         )
+        
         return Response({
             'project_id': projet.id,
-            'budget_overrun_probability': round((ml['budget_overrun_estimate'] or 0)/100.0, 3),
+            'delay_probability': round((ml['delay_probability'] or 0), 1),
+            'budget_overrun_estimate': round((ml['budget_overrun_estimate'] or 0), 1),
             'recommendations': ml['recommendations'],
             'features': features,
         })
     except Exception:
-        prob = _rule_based_budget_overrun_probability(features)
+        prob = _rule_based_delay_probability(features)
         return Response({
             'project_id': projet.id,
-            'budget_overrun_probability': prob,
+            'delay_probability': prob,
             'features': features,
         })
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def recommendations(request):
+def predict_budget_overrun_enhanced(request):
+    """Enhanced budget overrun prediction endpoint"""
     projet_id = request.query_params.get('projet')
     if not projet_id:
         return Response({'detail': 'Paramètre "projet" requis'}, status=status.HTTP_400_BAD_REQUEST)
@@ -156,7 +120,45 @@ def recommendations(request):
     except Projet.DoesNotExist:
         return Response({'detail': 'Projet introuvable'}, status=status.HTTP_404_NOT_FOUND)
 
-    f = _aggregate_project_features(projet)
+    features = _aggregate_project_features(projet)
+    
+    try:
+        ml = predict_from_input(
+            progress_percent=max(0.0, min(100.0, features['progress_ratio'] * 100)),
+            budget_spent=max(0.0, min(100.0, features['budget_ratio'] * 100)),
+            weather=1,
+            incidents=int(features['nb_risques'] or 0),
+        )
+        
+        return Response({
+            'project_id': projet.id,
+            'budget_overrun_estimate': round((ml['budget_overrun_estimate'] or 0), 1),
+            'recommendations': ml['recommendations'],
+            'features': features,
+        })
+    except Exception:
+        prob = _rule_based_budget_overrun_probability(features)
+        return Response({
+            'project_id': projet.id,
+            'budget_overrun_estimate': prob,
+            'features': features,
+        })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def recommendations_enhanced(request):
+    """Enhanced recommendations endpoint"""
+    projet_id = request.query_params.get('projet')
+    if not projet_id:
+        return Response({'detail': 'Paramètre "projet" requis'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        projet = Projet.objects.get(id=projet_id)
+    except Projet.DoesNotExist:
+        return Response({'detail': 'Projet introuvable'}, status=status.HTTP_404_NOT_FOUND)
+
+    features = _aggregate_project_features(projet)
+    
+    # Generate recommendations
     recs = []
     if f['progress_ratio'] < 0.5 and f['days_left'] <= (f['planned_days'] * 0.5):
         recs.append("Accélérer les phases critiques et réallouer des ressources.")
@@ -166,6 +168,7 @@ def recommendations(request):
         recs.append("Revoir le registre des risques et définir des plans de mitigation immédiats.")
     if not recs:
         recs.append("Poursuivre selon le plan actuel tout en surveillant les jalons clés.")
+    
     try:
         ml = predict_from_input(
             progress_percent=max(0.0, min(100.0, f['progress_ratio'] * 100)),
@@ -173,7 +176,12 @@ def recommendations(request):
             weather=1,
             incidents=int(f['nb_risques'] or 0),
         )
-        recs = list({*recs, *ml['recommendations']})  # fusionner sans doublons
+        recs = list({*recs, *ml['recommendations']})  # Merge without duplicates
     except Exception:
         pass
-    return Response({'project_id': projet.id, 'recommendations': recs, 'features': f})
+    
+    return Response({
+        'project_id': projet.id,
+        'recommendations': recs,
+        'features': f
+    })

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Projet, Risque, Phase, Budget, Action, Notification, Commentaire
+from .models import Projet, Risque, Phase, Budget, Action, Notification, Commentaire, AuditLog
 
 class ProjetSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,4 +34,10 @@ class NotificationSerializer(serializers.ModelSerializer):
 class CommentaireSerializer(serializers.ModelSerializer):
     class Meta:
         model = Commentaire
+        fields = '__all__'
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AuditLog
         fields = '__all__'

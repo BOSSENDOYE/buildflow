@@ -1,7 +1,8 @@
 from rest_framework.routers import DefaultRouter
 from .views import (
     ProjetViewSet, RisqueViewSet, PhaseViewSet, BudgetViewSet,
-    ActionViewSet, NotificationViewSet, CommentaireViewSet, PublicProjetViewSet
+    ActionViewSet, NotificationViewSet, CommentaireViewSet, PublicProjetViewSet,
+    AuditLogViewSet,
 )
 
 router = DefaultRouter()
@@ -13,5 +14,6 @@ router.register(r'budgets', BudgetViewSet, basename='budget')
 router.register(r'actions', ActionViewSet, basename='action')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'commentaires', CommentaireViewSet, basename='commentaire')
+router.register(r'audit', AuditLogViewSet, basename='audit')
 
 urlpatterns = router.urls
