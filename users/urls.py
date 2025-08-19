@@ -6,7 +6,8 @@ from .views import (
     get_user_permissions, 
     list_all_users, 
     update_user_role, 
-    get_roles_info
+    get_roles_info,
+    create_user_admin
 )
 
 router = DefaultRouter()
@@ -18,5 +19,6 @@ urlpatterns = [
     path('permissions/', get_user_permissions, name='user_permissions'),
     path('users/', list_all_users, name='list_users'),
     path('users/<int:user_id>/role/', update_user_role, name='update_user_role'),
+    path('users/create/', create_user_admin, name='create_user_admin'),
     path('roles/', get_roles_info, name='roles_info'),
 ]

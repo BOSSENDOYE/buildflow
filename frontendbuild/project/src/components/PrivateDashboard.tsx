@@ -609,7 +609,11 @@ const PrivateDashboard: React.FC = () => {
           <PredictionsPanel project={selectedProject || projects[0] || null} />
         </>
       ) : <div>Vous n'avez pas accès aux analytics.</div>;
-      case 'users': return userPermissions?.peut_gerer_utilisateurs ? <UserProfileManager /> : <div>Vous n'avez pas accès à la gestion des utilisateurs.</div>;
+      case 'users': {
+        const isAdminRole = user?.profilutilisateur?.role === 'ADMINISTRATEUR';
+        const canManageUsers = userPermissions?.peut_gerer_utilisateurs || isAdminRole;
+        return canManageUsers ? <UserProfileManager /> : <div>Vous n'avez pas accès à la gestion des utilisateurs.</div>;
+      }
       default: return renderDashboard();
     }
   };
@@ -652,7 +656,9 @@ const PrivateDashboard: React.FC = () => {
               { id: 'documents', label: 'Documents', icon: FileText },
               { id: 'audit', label: 'Traçabilité', icon: Shield },
               ...(userPermissions?.peut_voir_analytics ? [{ id: 'analytics', label: 'Analytics', icon: BarChart3 }] : []),
-              ...(userPermissions?.peut_gerer_utilisateurs ? [{ id: 'users', label: 'Utilisateurs', icon: Users }] : [])
+              ...((userPermissions?.peut_gerer_utilisateurs || user?.profilutilisateur?.role === 'ADMINISTRATEUR')
+                ? [{ id: 'users', label: 'Utilisateurs', icon: Users }]
+                : [])
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}

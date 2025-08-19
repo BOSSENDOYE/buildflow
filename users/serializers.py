@@ -9,6 +9,12 @@ class UserSerializer(serializers.ModelSerializer):
 
 class ProfilUtilisateurSerializer(serializers.ModelSerializer):
     utilisateur = UserSerializer(read_only=True)
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Ajouter dynamiquement les permissions calculées
+        data['permissions'] = instance.get_permissions()
+        return data
 
     class Meta:
         model = ProfilUtilisateur
