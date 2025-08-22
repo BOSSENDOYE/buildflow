@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Users, Calendar, TrendingUp, FileText, AlertTriangle, CheckCircle2, Clock, DollarSign, Menu, X, Bell, Search, Plus, Filter, Download, Eye, Edit, Trash2, Settings, LogOut, Shield, Zap, Brain, Target, BarChart3, Activity, Lightbulb, ArrowRight, Globe } from 'lucide-react';
+import ProjectPhasesView from './ProjectPhasesView';
+import DocumentsPanel from './DocumentsPanel';
+import AuditPanel from './AuditPanel';
+import PredictionsPanel from './PredictionsPanel';
+import AnalyticsPanel from './AnalyticsPanel';
 import { useAuth } from '../contexts/AuthContext';
 import projectService, { Project } from '../services/projectService';
 import authService from '../services/authService';
@@ -34,7 +39,7 @@ const mockRecommendations: Recommendation[] = [];
 
 const PrivateDashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const [activeView, setActiveView] = useState<'dashboard' | 'projects' | 'phases' | 'documents' | 'analytics' | 'users'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'projects' | 'phases' | 'documents' | 'analytics' | 'users' | 'audit'>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -164,9 +169,8 @@ const PrivateDashboard: React.FC = () => {
   };
 
   const handleViewProject = (project: Project) => {
-    // Navigation vers la page de détail du projet
-    console.log('Voir le projet:', project);
-    // Ici vous pouvez implémenter la navigation
+    setSelectedProject(project);
+    setActiveView('phases');
   };
 
   const handleExportData = () => {
@@ -595,10 +599,21 @@ const PrivateDashboard: React.FC = () => {
     switch (activeView) {
       case 'dashboard': return renderDashboard();
       case 'projects': return renderProjects();
-      case 'phases': return <div>Phases à venir...</div>;
-      case 'documents': return <div>Documents à venir...</div>;
-      case 'analytics': return userPermissions?.peut_voir_analytics ? <div>Analytics à venir...</div> : <div>Vous n'avez pas accès aux analytics.</div>;
-      case 'users': return userPermissions?.peut_gerer_utilisateurs ? <UserProfileManager /> : <div>Vous n'avez pas accès à la gestion des utilisateurs.</div>;
+      case 'phases': return <ProjectPhasesView projectId={selectedProject?.id ?? null} />;
+      case 'documents': return <DocumentsPanel project={selectedProject || projects[0] || null} />;
+      case 'audit': return <AuditPanel project={selectedProject || projects[0] || null} />;
+      case 'analytics': return userPermissions?.peut_voir_analytics ? (
+        <>
+          <AnalyticsPanel project={selectedProject || projects[0] || null} />
+          <div className="mt-8" />
+          <PredictionsPanel project={selectedProject || projects[0] || null} />
+        </>
+      ) : <div>Vous n'avez pas accès aux analytics.</div>;
+      case 'users': {
+        const isAdminRole = user?.profilutilisateur?.role === 'ADMINISTRATEUR';
+        const canManageUsers = userPermissions?.peut_gerer_utilisateurs || isAdminRole;
+        return canManageUsers ? <UserProfileManager /> : <div>Vous n'avez pas accès à la gestion des utilisateurs.</div>;
+      }
       default: return renderDashboard();
     }
   };
@@ -639,8 +654,11 @@ const PrivateDashboard: React.FC = () => {
               { id: 'projects', label: 'Mes Projets', icon: Building2 },
               { id: 'phases', label: 'Phases', icon: Calendar },
               { id: 'documents', label: 'Documents', icon: FileText },
+              { id: 'audit', label: 'Traçabilité', icon: Shield },
               ...(userPermissions?.peut_voir_analytics ? [{ id: 'analytics', label: 'Analytics', icon: BarChart3 }] : []),
-              ...(userPermissions?.peut_gerer_utilisateurs ? [{ id: 'users', label: 'Utilisateurs', icon: Users }] : [])
+              ...((userPermissions?.peut_gerer_utilisateurs || user?.profilutilisateur?.role === 'ADMINISTRATEUR')
+                ? [{ id: 'users', label: 'Utilisateurs', icon: Users }]
+                : [])
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}

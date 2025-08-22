@@ -1,12 +1,27 @@
+<<<<<<< HEAD
 import os
 from decouple import config, Csv
+=======
+>>>>>>> 7ddd56f5fd0354e2af1a87a084e274e8a2552934
 
+import os
+from datetime import timedelta
+
+# === BASE DIR ===
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+<<<<<<< HEAD
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-buildflow-2024-secret-key-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+=======
+# === SÉCURITÉ ===
+SECRET_KEY = 'django-insecure-buildflow-2024-secret-key-change-in-production'
+DEBUG = True
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+>>>>>>> 7ddd56f5fd0354e2af1a87a084e274e8a2552934
 
+# === APPLICATIONS ===
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -14,20 +29,25 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Extensions
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
+
+    # Applications du projet
     'projects',
     'users',
     'documents',
     'analytics',
 ]
 
+# === MIDDLEWARE ===
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -35,6 +55,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# === URLS & WSGI ===
 ROOT_URLCONF = 'buildflow.urls'
 
 TEMPLATES = [
@@ -55,6 +76,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'buildflow.wsgi.application'
 
+<<<<<<< HEAD
 # Configuration base de données via variables d'environnement
 DB_ENGINE = config('DB_ENGINE', default='sqlite').lower()
 
@@ -79,37 +101,38 @@ else:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
         }
+=======
+# === BASE DE DONNÉES (SQLite) ===
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+>>>>>>> 7ddd56f5fd0354e2af1a87a084e274e8a2552934
     }
 
+# === VALIDATEURS DE MOT DE PASSE ===
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# === LOCALISATION ===
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
+# === FICHIERS STATIQUES ET MÉDIA ===
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Configuration des fichiers média
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Configuration du stockage AWS S3
+# === STOCKAGE CLOUD (désactivé ici mais présent) ===
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='your_aws_access_key')
 AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='your_aws_secret_key')
@@ -118,7 +141,7 @@ AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
 AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
 
-# Configuration Django REST Framework
+# === DJANGO REST FRAMEWORK ===
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -136,8 +159,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Configuration JWT
-from datetime import timedelta
+# === JWT ===
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -146,9 +168,6 @@ SIMPLE_JWT = {
     'UPDATE_LAST_LOGIN': False,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
-    'AUDIENCE': None,
-    'ISSUER': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
@@ -158,7 +177,7 @@ SIMPLE_JWT = {
     'JTI_CLAIM': 'jti',
 }
 
-# Configuration CORS
+# === CORS ===
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -166,11 +185,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 ]
-
 CORS_ALLOW_CREDENTIALS = True
+
+# === CONFIGURATION CORS ===
 
 # Méthodes HTTP autorisées pour CORS
 CORS_ALLOW_METHODS = [
@@ -195,11 +217,27 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-# Configuration de sécurité
+# Autoriser les origines de confiance (si cookies/CSRF utilisés)
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+]
+
+# En dev, faciliter le débogage CORS
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+
+# === SÉCURITÉ EN PRODUCTION ===
 if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True 
+    SECURE_HSTS_PRELOAD = True

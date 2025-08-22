@@ -3,11 +3,12 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import models
-from .models import Projet, Risque, Phase, Budget, Action, Notification, Commentaire
+from .models import Projet, Risque, Phase, Budget, Action, Notification, Commentaire, AuditLog
 from .serializers import (
     ProjetSerializer, RisqueSerializer, PhaseSerializer, BudgetSerializer,
-    ActionSerializer, NotificationSerializer, CommentaireSerializer
+    ActionSerializer, NotificationSerializer, CommentaireSerializer, AuditLogSerializer
 )
+from .utils import create_audit_log
 
 class ProjetViewSet(viewsets.ModelViewSet):
     queryset = Projet.objects.all()
@@ -43,7 +44,15 @@ class ProjetViewSet(viewsets.ModelViewSet):
                 'message': 'Profil utilisateur non trouvé.'
             }, status=status.HTTP_403_FORBIDDEN)
         
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        try:
+            instance_id = response.data.get('id')
+            if instance_id:
+                instance = Projet.objects.get(id=instance_id)
+                create_audit_log(user, 'CREATE', instance, before=None)
+        except Exception:
+            pass
+        return response
     
     def update(self, request, *args, **kwargs):
         """Vérifier les permissions avant la modification"""
@@ -58,7 +67,21 @@ class ProjetViewSet(viewsets.ModelViewSet):
                 'message': 'Profil utilisateur non trouvé.'
             }, status=status.HTTP_403_FORBIDDEN)
         
-        return super().update(request, *args, **kwargs)
+        partial = kwargs.get('partial', False)
+        instance = self.get_object()
+        before = None
+        try:
+            from django.forms.models import model_to_dict
+            before = model_to_dict(instance)
+        except Exception:
+            pass
+        response = super().update(request, *args, **kwargs)
+        try:
+            instance.refresh_from_db()
+            create_audit_log(user, 'UPDATE', instance, before=before)
+        except Exception:
+            pass
+        return response
     
     def destroy(self, request, *args, **kwargs):
         """Vérifier les permissions avant la suppression"""
@@ -73,7 +96,19 @@ class ProjetViewSet(viewsets.ModelViewSet):
                 'message': 'Profil utilisateur non trouvé.'
             }, status=status.HTTP_403_FORBIDDEN)
         
-        return super().destroy(request, *args, **kwargs)
+        instance = self.get_object()
+        before = None
+        try:
+            from django.forms.models import model_to_dict
+            before = model_to_dict(instance)
+        except Exception:
+            pass
+        response = super().destroy(request, *args, **kwargs)
+        try:
+            create_audit_log(user, 'DELETE', instance, before=before, after=None)
+        except Exception:
+            pass
+        return response
 
 class RisqueViewSet(viewsets.ModelViewSet):
     queryset = Risque.objects.all()
@@ -97,13 +132,25 @@ class ActionViewSet(viewsets.ModelViewSet):
 
 class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all()
-    serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+    serializer_class = NotificationSerializer
+    filterset_fields = ['utilisateur', 'projet', 'type', 'lu']
+    ordering = ['-date_creation']
 
 class CommentaireViewSet(viewsets.ModelViewSet):
     queryset = Commentaire.objects.all()
     serializer_class = CommentaireSerializer
     permission_classes = [IsAuthenticated]
+    filterset_fields = ['projet', 'auteur']
+    ordering = ['-date_creation']
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = AuditLog.objects.all()
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['resource_type', 'resource_id', 'utilisateur__id', 'action']
+    ordering = ['-date_creation']
 
 class PublicProjetViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet pour les projets publics (accessible sans authentification)"""

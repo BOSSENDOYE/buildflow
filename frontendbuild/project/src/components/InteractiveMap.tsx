@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -24,6 +24,13 @@ interface Project {
   longitude: number;
 }
 
+interface Region {
+  id: string;
+  nom: string;
+  center: [number, number];
+  bounds: L.LatLngBounds;
+}
+
 interface InteractiveMapProps {
   projects: Project[];
   onProjectClick?: (project: Project) => void;
@@ -38,6 +45,141 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const regionsRef = useRef<L.GeoJSON | null>(null);
+  const selectedRegionRef = useRef<string | null>(null);
+  
+  const [selectedRegion, setSelectedRegion] = useState<string>('');
+
+  // Définition des régions du Sénégal avec leurs coordonnées et limites
+  const regions: Region[] = [
+    {
+      id: 'dakar',
+      nom: 'Dakar',
+      center: [14.7167, -17.4677],
+      bounds: L.latLngBounds([14.6, -17.6], [14.8, -17.3])
+    },
+    {
+      id: 'thies',
+      nom: 'Thiès',
+      center: [14.7833, -16.9333],
+      bounds: L.latLngBounds([14.6, -17.1], [14.9, -16.7])
+    },
+    {
+      id: 'saint-louis',
+      nom: 'Saint-Louis',
+      center: [16.0333, -16.5000],
+      bounds: L.latLngBounds([15.8, -16.7], [16.2, -16.3])
+    },
+    {
+      id: 'diourbel',
+      nom: 'Diourbel',
+      center: [14.6500, -16.2333],
+      bounds: L.latLngBounds([14.5, -16.4], [14.8, -16.0])
+    },
+    {
+      id: 'kaolack',
+      nom: 'Kaolack',
+      center: [14.1500, -16.0833],
+      bounds: L.latLngBounds([14.0, -16.2], [14.3, -15.9])
+    },
+    {
+      id: 'louga',
+      nom: 'Louga',
+      center: [15.6167, -16.2167],
+      bounds: L.latLngBounds([15.4, -16.4], [15.8, -16.0])
+    },
+    {
+      id: 'fatick',
+      nom: 'Fatick',
+      center: [14.3333, -16.4167],
+      bounds: L.latLngBounds([14.1, -16.6], [14.5, -16.2])
+    },
+    {
+      id: 'kaffrine',
+      nom: 'Kaffrine',
+      center: [14.1167, -15.5500],
+      bounds: L.latLngBounds([13.9, -15.7], [14.3, -15.4])
+    },
+    {
+      id: 'kolda',
+      nom: 'Kolda',
+      center: [12.8833, -14.9500],
+      bounds: L.latLngBounds([12.7, -15.1], [13.1, -14.8])
+    },
+    {
+      id: 'sedhiou',
+      nom: 'Sédhiou',
+      center: [12.7000, -15.5500],
+      bounds: L.latLngBounds([12.5, -15.7], [12.9, -15.4])
+    },
+    {
+      id: 'tambacounda',
+      nom: 'Tambacounda',
+      center: [13.7667, -13.6667],
+      bounds: L.latLngBounds([13.5, -13.9], [14.0, -13.4])
+    },
+    {
+      id: 'kedougou',
+      nom: 'Kédougou',
+      center: [12.5500, -12.1833],
+      bounds: L.latLngBounds([12.3, -12.4], [12.8, -12.0])
+    },
+    {
+      id: 'matam',
+      nom: 'Matam',
+      center: [15.6500, -13.2500],
+      bounds: L.latLngBounds([15.4, -13.5], [15.9, -13.0])
+    },
+    {
+      id: 'ziguinchor',
+      nom: 'Ziguinchor',
+      center: [12.5833, -16.2833],
+      bounds: L.latLngBounds([12.4, -16.5], [12.7, -16.1])
+    }
+  ];
+
+  // Fonction pour zoomer sur une région
+  const zoomToRegion = (regionId: string) => {
+    if (!mapInstanceRef.current) return;
+    
+    const region = regions.find(r => r.id === regionId);
+    if (!region) return;
+
+    // Mettre à jour la sélection
+    setSelectedRegion(regionId);
+    selectedRegionRef.current = regionId;
+
+    // Zoom sur la région
+    mapInstanceRef.current.fitBounds(region.bounds, { padding: [20, 20] });
+
+    // Mettre à jour le style des régions
+    updateRegionStyles();
+  };
+
+  // Fonction pour mettre à jour les styles des régions
+  const updateRegionStyles = () => {
+    if (!regionsRef.current) return;
+
+    regionsRef.current.setStyle((feature) => {
+      const regionId = feature.properties?.id;
+      const isSelected = regionId === selectedRegionRef.current;
+
+      return {
+        fillColor: isSelected ? '#3B82F6' : '#10B981',
+        weight: isSelected ? 3 : 1,
+        opacity: isSelected ? 1 : 0.7,
+        color: isSelected ? '#1D4ED8' : '#059669',
+        fillOpacity: isSelected ? 0.3 : 0.1
+      };
+    });
+  };
+
+  // Gestionnaire de clic sur une région
+  const handleRegionClick = (regionId: string) => {
+    setSelectedRegion(regionId);
+    selectedRegionRef.current = regionId;
+    updateRegionStyles();
+  };
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -46,13 +188,39 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     const senegalCenter: [number, number] = [14.7167, -17.4677];
 
     // Créer la carte
-    const map = L.map(mapRef.current).setView(senegalCenter, 8);
+    const map = L.map(mapRef.current).setView(senegalCenter, 7);
 
     // Ajouter la couche de tuiles OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(map);
+
+    // Créer les polygones des régions (simplifiés)
+    const regionPolygons = regions.map(region => {
+      const bounds = region.bounds;
+      const polygon = L.rectangle(bounds, {
+        fillColor: '#10B981',
+        weight: 1,
+        opacity: 0.7,
+        color: '#059669',
+        fillOpacity: 0.1
+      });
+
+      // Ajouter un popup avec le nom de la région
+      polygon.bindPopup(`<b>${region.nom}</b><br>Cliquez pour sélectionner`);
+      
+      // Gestionnaire de clic
+      polygon.on('click', () => {
+        handleRegionClick(region.id);
+        zoomToRegion(region.id);
+      });
+
+      return polygon;
+    });
+
+    // Ajouter tous les polygones à la carte
+    regionPolygons.forEach(polygon => polygon.addTo(map));
 
     // Sauvegarder l'instance de la carte
     mapInstanceRef.current = map;
@@ -98,174 +266,99 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
             color: white;
+            font-weight: bold;
+            font-size: 12px;
           ">
             ${type.charAt(0).toUpperCase()}
           </div>
         `,
         iconSize: [30, 30],
-        iconAnchor: [15, 15],
-        popupAnchor: [0, -15]
+        iconAnchor: [15, 15]
       });
     };
 
     // Ajouter les marqueurs pour chaque projet
     projects.forEach(project => {
-      const marker = L.marker([project.latitude, project.longitude], {
-        icon: createCustomIcon(project.type)
-      }).addTo(mapInstanceRef.current!);
+      if (project.latitude && project.longitude) {
+        const marker = L.marker([project.latitude, project.longitude], {
+          icon: createCustomIcon(project.type)
+        }).addTo(mapInstanceRef.current!);
 
-      // Créer le contenu du popup
-      const popupContent = `
-        <div style="min-width: 200px;">
-          <h3 style="margin: 0 0 8px 0; color: #333; font-size: 16px; font-weight: bold;">
-            ${project.nom}
-          </h3>
-          <div style="margin-bottom: 8px;">
-            <span style="
-              padding: 4px 8px;
-              border-radius: 12px;
-              font-size: 12px;
-              font-weight: bold;
-              color: white;
-              background-color: ${
-                project.statut === 'EN_COURS' ? '#FF6B35' :
-                project.statut === 'TERMINE' ? '#4ECDC4' :
-                '#FFE66D'
-              };
-            ">
-              ${project.statut === 'EN_COURS' ? 'En cours' :
-                project.statut === 'TERMINE' ? 'Terminé' : 'En attente'}
-            </span>
+        // Ajouter un popup avec les informations du projet
+        const popupContent = `
+          <div class="p-2">
+            <h3 class="font-bold text-lg mb-2">${project.nom}</h3>
+            <p class="text-sm text-gray-600 mb-1"><strong>Type:</strong> ${project.type}</p>
+            <p class="text-sm text-gray-600 mb-1"><strong>Région:</strong> ${project.region}</p>
+            <p class="text-sm text-gray-600 mb-1"><strong>Statut:</strong> ${project.statut}</p>
+            <p class="text-sm text-gray-600 mb-1"><strong>Progression:</strong> ${project.progression}%</p>
+            <p class="text-sm text-gray-600 mb-1"><strong>Budget:</strong> ${project.budget_prevue.toLocaleString()} FCFA</p>
           </div>
-          <div style="font-size: 14px; color: #666; margin-bottom: 8px;">
-            <strong>Type:</strong> ${getTypeLabel(project.type)}<br>
-            <strong>Région:</strong> ${project.region}<br>
-            <strong>Progression:</strong> ${project.progression}%<br>
-            <strong>Budget:</strong> ${formatCurrency(project.budget_reel)}<br>
-            <strong>Fin prévue:</strong> ${formatDate(project.date_fin_prevue)}
-          </div>
-          <div style="
-            width: 100%;
-            height: 6px;
-            background-color: #eee;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 8px;
-          ">
-            <div style="
-              width: ${project.progression}%;
-              height: 100%;
-              background-color: #4ECDC4;
-              transition: width 0.3s ease;
-            "></div>
-          </div>
-        </div>
-      `;
+        `;
+        marker.bindPopup(popupContent);
 
-      marker.bindPopup(popupContent);
-
-      // Ajouter un gestionnaire de clic
-      if (onProjectClick) {
+        // Gestionnaire de clic sur le marqueur
         marker.on('click', () => {
-          onProjectClick(project);
+          if (onProjectClick) {
+            onProjectClick(project);
+          }
         });
+
+        markersRef.current.push(marker);
       }
-
-      markersRef.current.push(marker);
     });
-
-    // Ajuster la vue pour inclure tous les marqueurs si il y en a
-    if (projects.length > 0) {
-      const group = new L.featureGroup(markersRef.current);
-      mapInstanceRef.current.fitBounds(group.getBounds().pad(0.1));
-    }
-
   }, [projects, onProjectClick]);
 
-  const getTypeLabel = (type: string) => {
-    const types: { [key: string]: string } = {
-      'route': 'Route',
-      'ecole': 'École',
-      'hopital': 'Hôpital',
-      'pont': 'Pont',
-      'residence': 'Résidence',
-      'centre-commercial': 'Centre Commercial'
-    };
-    return types[type] || type;
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XOF',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR');
-  };
-
   return (
-    <div className={`relative ${className}`}>
-      <div 
-        ref={mapRef} 
-        className="w-full h-full rounded-lg shadow-lg"
-        style={{ minHeight: '400px' }}
-      />
-      
-      {/* Message quand aucun projet */}
-      {projects.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-20">
-          <div className="text-center p-8">
-            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Aucun projet disponible</h3>
-            <p className="text-gray-500 text-sm">
-              Aucun projet d'infrastructure n'est actuellement affiché sur la carte.
-            </p>
-          </div>
-        </div>
-      )}
-      
-      {/* Légende */}
-      <div className="absolute top-4 right-4 bg-white p-4 rounded-lg shadow-lg z-10">
-        <h4 className="text-sm font-semibold mb-2">Types de projets</h4>
-        <div className="space-y-1">
-          {[
-            { type: 'route', label: 'Route', color: '#FF6B35' },
-            { type: 'ecole', label: 'École', color: '#4ECDC4' },
-            { type: 'hopital', label: 'Hôpital', color: '#FFE66D' },
-            { type: 'pont', label: 'Pont', color: '#95E6D3' },
-            { type: 'residence', label: 'Résidence', color: '#F38181' },
-            { type: 'centre-commercial', label: 'Centre Commercial', color: '#A8E6CF' }
-          ].map(({ type, label, color }) => (
-            <div key={type} className="flex items-center space-x-2">
-              <div 
-                className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
-                style={{ backgroundColor: color }}
-              ></div>
-              <span className="text-xs text-gray-700">{label}</span>
-            </div>
+    <div className="space-y-4">
+      {/* Liste déroulante des régions */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <label htmlFor="region-select" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+          Sélectionner une région :
+        </label>
+        <select
+          id="region-select"
+          value={selectedRegion}
+          onChange={(e) => zoomToRegion(e.target.value)}
+          className="block w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="">-- Choisir une région --</option>
+          {regions.map((region) => (
+            <option key={region.id} value={region.id}>
+              {region.nom}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
 
-      {/* Statistiques */}
-      <div className="absolute bottom-4 left-4 bg-white p-4 rounded-lg shadow-lg z-10">
-        <h4 className="text-sm font-semibold mb-2">Statistiques</h4>
-        <div className="space-y-1 text-xs">
-          <div>Total: {projects.length} projets</div>
-          <div>En cours: {projects.filter(p => p.statut === 'EN_COURS').length}</div>
-          <div>Terminés: {projects.filter(p => p.statut === 'TERMINE').length}</div>
-          <div>En attente: {projects.filter(p => p.statut === 'EN_ATTENTE').length}</div>
+      {/* Carte */}
+      <div 
+        ref={mapRef} 
+        className={className}
+        style={{ 
+          border: '2px solid #e5e7eb',
+          borderRadius: '0.5rem',
+          overflow: 'hidden'
+        }}
+      />
+      
+      {/* Légende */}
+      <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <h3 className="text-sm font-medium text-gray-900 mb-3">Légende</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <span>Régions</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            <span>Région sélectionnée</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-orange-500 rounded"></div>
+            <span>Projets</span>
+          </div>
         </div>
       </div>
     </div>

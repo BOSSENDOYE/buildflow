@@ -32,6 +32,8 @@ const UserProfileManager: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [error, setError] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newUser, setNewUser] = useState({ username: '', email: '', first_name: '', last_name: '', password: '', role: 'GESTIONNAIRE' });
 
   useEffect(() => {
     loadData();
@@ -42,15 +44,24 @@ const UserProfileManager: React.FC = () => {
       setIsLoading(true);
       
       // Charger les utilisateurs et rôles
-      const [usersData, rolesData] = await Promise.all([
+      const [usersData, rolesOptions] = await Promise.all([
         authService.listAllUsers(),
-        authService.getRolesInfo()
+        authService.getRolesOptions()
       ]);
       
       setUsers(usersData);
-      setRoles(rolesData);
-    } catch (error) {
+      setRoles(Array.isArray(rolesOptions) ? rolesOptions as any : []);
+    } catch (error: any) {
       console.error('Error loading data:', error);
+      // Afficher une erreur explicite à l'utilisateur
+      const status = error?.response?.status;
+      if (status === 401) {
+        setError("Session expirée ou non authentifiée. Veuillez vous reconnecter.");
+      } else if (status === 403) {
+        setError("Accès refusé. Cette page est réservée aux administrateurs.");
+      } else {
+        setError(error?.response?.data?.message || 'Impossible de charger les données des utilisateurs.');
+      }
       // Données de test
       setUsers([
         {
@@ -166,12 +177,22 @@ const UserProfileManager: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-2" />
+            <div>
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Gestion des Utilisateurs</h1>
           <p className="text-gray-600 mt-2">Gérez les profils et permissions des utilisateurs</p>
         </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2">
+        <button onClick={() => setShowCreateModal(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2">
           <Plus className="h-4 w-4" />
           <span>Nouvel Utilisateur</span>
         </button>
@@ -179,7 +200,7 @@ const UserProfileManager: React.FC = () => {
 
       {/* Statistiques des rôles */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {roles.map((role) => (
+        {Array.isArray(roles) ? roles.map((role) => (
           <div key={role.id} className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -202,7 +223,7 @@ const UserProfileManager: React.FC = () => {
               </div>
             </div>
           </div>
-        ))}
+        )) : null}
       </div>
 
       {/* Liste des utilisateurs */}
@@ -317,7 +338,7 @@ const UserProfileManager: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                {roles.map((role) => (
+                {Array.isArray(roles) ? roles.map((role) => (
                   <button
                     key={role.id}
                     onClick={() => handleRoleChange(selectedUser.id, role.name)}
@@ -339,7 +360,7 @@ const UserProfileManager: React.FC = () => {
                       )}
                     </div>
                   </button>
-                ))}
+                )) : null}
               </div>
 
               {error && (
@@ -347,6 +368,53 @@ const UserProfileManager: React.FC = () => {
                   <p className="text-sm text-red-600">{error}</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale de création d'utilisateur */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowCreateModal(false)}></div>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-semibold text-gray-900">Créer un Utilisateur</h2>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <input className="w-full border rounded-lg px-3 py-2" placeholder="Nom d'utilisateur" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} />
+              <input className="w-full border rounded-lg px-3 py-2" placeholder="Email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <input className="w-full border rounded-lg px-3 py-2" placeholder="Prénom" value={newUser.first_name} onChange={e => setNewUser({ ...newUser, first_name: e.target.value })} />
+                <input className="w-full border rounded-lg px-3 py-2" placeholder="Nom" value={newUser.last_name} onChange={e => setNewUser({ ...newUser, last_name: e.target.value })} />
+              </div>
+              <input type="password" className="w-full border rounded-lg px-3 py-2" placeholder="Mot de passe" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
+              <select className="w-full border rounded-lg px-3 py-2" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
+                <option value="ADMINISTRATEUR">Administrateur</option>
+                <option value="GESTIONNAIRE">Gestionnaire</option>
+                <option value="CONSULTANT">Consultant</option>
+              </select>
+              {error && <div className="text-sm text-red-600">{error}</div>}
+            </div>
+            <div className="flex items-center justify-end gap-3 p-6 border-t">
+              <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">Annuler</button>
+              <button
+                onClick={async () => {
+                  try {
+                    setError('');
+                    const created = await authService.createUser(newUser as any);
+                    setUsers(prev => [...prev, created]);
+                    setShowCreateModal(false);
+                    setNewUser({ username: '', email: '', first_name: '', last_name: '', password: '', role: 'GESTIONNAIRE' });
+                  } catch (e: any) {
+                    setError(e?.response?.data?.message || 'Erreur lors de la création');
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >Créer</button>
             </div>
           </div>
         </div>

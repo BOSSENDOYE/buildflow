@@ -53,6 +53,13 @@ export interface RoleDetails {
   features: string[];
 }
 
+// Forme normalisée pour l'IU
+export interface RoleOption {
+  id: number;
+  name: string;
+  permissions: UserPermissions;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -78,9 +85,9 @@ class AuthService {
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
       
-      // Get user profile
-      const userResponse = await api.get('/users/profils/');
-      const user = userResponse.data.results?.[0] || userResponse.data;
+      // Get current user profile (endpoint dédié)
+      const userResponse = await api.get('/users/profils/me/');
+      const user = userResponse.data;
       
       return {
         access,
@@ -114,8 +121,8 @@ class AuthService {
       const token = localStorage.getItem('access_token');
       if (!token) return null;
 
-      const response = await api.get('/users/profils/');
-      const user = response.data.results?.[0] || response.data;
+      const response = await api.get('/users/profils/me/');
+      const user = response.data;
       
       return {
         id: user.utilisateur.id,
@@ -158,14 +165,49 @@ class AuthService {
       return response.data;
     } catch (error) {
       console.error('Error fetching roles info:', error);
-      return {};
+      return {} as Record<string, RoleDetails>;
+    }
+  }
+
+  async getRolesOptions(): Promise<RoleOption[]> {
+    try {
+      const data = await this.getRolesInfo();
+      const rolesArray: RoleOption[] = Object.keys(data).map((name, index) => {
+        const role = data[name];
+        const perms = new Set(role.permissions);
+        return {
+          id: index + 1,
+          name,
+          permissions: {
+            peut_creer_projet: perms.has('peut_creer_projet'),
+            peut_modifier_projet: perms.has('peut_modifier_projet'),
+            peut_supprimer_projet: perms.has('peut_supprimer_projet'),
+            peut_gerer_utilisateurs: perms.has('peut_gerer_utilisateurs'),
+            peut_voir_analytics: perms.has('peut_voir_analytics'),
+            peut_exporter_donnees: perms.has('peut_exporter_donnees'),
+          }
+        };
+      });
+      return rolesArray;
+    } catch (error) {
+      console.error('Error building roles options:', error);
+      return [];
     }
   }
 
   async listAllUsers(): Promise<User[]> {
     try {
       const response = await api.get('/users/users/');
-      return response.data;
+      const apiUsers = response.data as any[];
+      return apiUsers.map((u) => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        role: u.role,
+        is_active: u.actif ?? true,
+      }));
     } catch (error) {
       console.error('Error fetching users:', error);
       return [];
@@ -182,6 +224,20 @@ class AuthService {
       console.error('Error updating user role:', error);
       throw error;
     }
+  }
+
+  async createUser(params: { username: string; email: string; first_name?: string; last_name?: string; password: string; role: string }): Promise<User> {
+    const response = await api.post('/users/users/create/', params);
+    const u = response.data;
+    return {
+      id: u.id,
+      username: u.username,
+      email: u.email,
+      first_name: u.first_name,
+      last_name: u.last_name,
+      role: u.role,
+      is_active: u.actif ?? true,
+    };
   }
 
   isAuthenticated(): boolean {

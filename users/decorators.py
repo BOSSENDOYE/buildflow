@@ -18,7 +18,12 @@ def require_permission(permission_name):
                 )
             
             try:
-                profil = request.user.profilutilisateur
+                # Garantir l'existence du profil
+                from .models import ProfilUtilisateur
+                profil, _ = ProfilUtilisateur.objects.get_or_create(
+                    utilisateur=request.user,
+                    defaults={'role': 'ADMINISTRATEUR' if getattr(request.user, 'is_superuser', False) else 'GESTIONNAIRE'}
+                )
                 if not profil.has_permission(permission_name):
                     return Response(
                         {'message': f'Permission "{permission_name}" requise'}, 
@@ -48,7 +53,12 @@ def require_role(role_name):
                 )
             
             try:
-                profil = request.user.profilutilisateur
+                # Garantir l'existence du profil
+                from .models import ProfilUtilisateur
+                profil, _ = ProfilUtilisateur.objects.get_or_create(
+                    utilisateur=request.user,
+                    defaults={'role': 'ADMINISTRATEUR' if getattr(request.user, 'is_superuser', False) else 'GESTIONNAIRE'}
+                )
                 if profil.role != role_name:
                     return Response(
                         {'message': f'Rôle "{role_name}" requis'}, 

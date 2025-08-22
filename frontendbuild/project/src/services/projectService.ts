@@ -12,6 +12,10 @@ export interface Project {
   budget_reel?: number;
   chef_projet?: number;
   membres: number[];
+  // Nouveaux champs
+  nom_entreprise?: string;
+  latitude?: number;
+  longitude?: number;
   date_creation: string;
   date_modification: string;
 }
