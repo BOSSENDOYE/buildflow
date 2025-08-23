@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, AlertTriangle, CheckCircle, Plus } from 'lucide-react';
 import { Project } from '../services/projectService';
-import authService, { User } from '../services/authService';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -19,7 +18,6 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
   mode
 }) => {
   const modalRef = React.useRef<HTMLDivElement>(null);
-  const [users, setUsers] = useState<User[]>([]);
 
   // Gestion du focus et de l'accessibilité
   React.useEffect(() => {
@@ -52,19 +50,6 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  useEffect(() => {
-    let mounted = true;
-    // Essaye de charger la liste des utilisateurs (admin requis). En cas d'échec, on ignore.
-    authService
-      .listAllUsers()
-      .then((list) => {
-        if (mounted) setUsers(list || []);
-      })
-      .catch(() => {});
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const [formData, setFormData] = useState({
     nom: project?.nom || '',
@@ -74,9 +59,10 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
     budget_prevue: project?.budget_prevue || 0,
     statut: project?.statut || 'EN_ATTENTE',
     // nouveaux champs
-    nom_entreprise: (project as any)?.nom_entreprise || '',
-    latitude: (project as any)?.latitude ?? undefined,
-    longitude: (project as any)?.longitude ?? undefined,
+    nom_entreprise: project?.nom_entreprise || '',
+    region: project?.region || '',
+    departement: project?.departement || '',
+    etape_actuelle: project?.etape_actuelle || undefined,
     chef_projet: project?.chef_projet || undefined,
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -96,12 +82,13 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
           budget_prevue: Number(formData.budget_prevue),
           membres: project?.membres || [],
           chef_projet: formData.chef_projet ? Number(formData.chef_projet) : undefined,
-          latitude: formData.latitude !== undefined && formData.latitude !== null && (formData.latitude as any) !== '' ? Number(formData.latitude) : undefined,
-          longitude: formData.longitude !== undefined && formData.longitude !== null && (formData.longitude as any) !== '' ? Number(formData.longitude) : undefined,
+          region: formData.region || undefined,
+          departement: formData.departement || undefined,
+          etape_actuelle: formData.etape_actuelle || undefined,
         });
       }
       onClose();
-    } catch (err) {
+    } catch {
       setError('Une erreur est survenue. Veuillez réessayer.');
     } finally {
       setIsLoading(false);
@@ -255,30 +242,14 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-base font-medium text-gray-700 mb-2">Chef de projet</label>
-                {users && users.length > 0 ? (
-                  <select
-                    name="chef_projet"
-                    value={formData.chef_projet ?? ''}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
-                  >
-                    <option value="">(Moi ou sélectionnez)</option>
-                    {users.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}`.trim() : u.username} (#{u.id})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="number"
-                    name="chef_projet"
-                    value={formData.chef_projet ?? ''}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
-                    placeholder="ID utilisateur (optionnel)"
-                  />
-                )}
+                <input
+                  type="text"
+                  name="chef_projet"
+                  value={formData.chef_projet ?? ''}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                  placeholder="Ex: Jean Dupont"
+                />
               </div>
               <div>
                 <label className="block text-base font-medium text-gray-700 mb-2">Nom de l’entreprise</label>
@@ -294,32 +265,107 @@ const ProjectModals: React.FC<ProjectModalProps> = ({
             </div>
           </div>
 
+          <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">🏗️ Étape actuelle</h3>
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Étape actuelle du projet
+              </label>
+              <select
+                name="etape_actuelle"
+                value={formData.etape_actuelle || ''}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                aria-label="Étape actuelle du projet"
+              >
+                <option value="">Sélectionnez une étape</option>
+                <option value="PREPARATION">Préparation</option>
+                <option value="FONDATIONS">Fondations</option>
+                <option value="GROS_OEUVRE">Gros œuvre</option>
+                <option value="SECOND_OEUVRE">Second œuvre</option>
+                <option value="FINITIONS">Finitions</option>
+                <option value="AMENAGEMENT">Aménagement</option>
+                <option value="RECEPTION">Réception</option>
+              </select>
+            </div>
+          </div>
+
           <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">📍 Géolocalisation</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">📍 Localisation</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">Latitude</label>
-                <input
-                  type="number"
-                  step="0.000001"
-                  name="latitude"
-                  value={formData.latitude ?? ''}
+                <label className="block text-base font-medium text-gray-700 mb-2">Région</label>
+                <select
+                  name="region"
+                  value={formData.region}
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
-                  placeholder="14.6937"
-                />
+                >
+                  <option value="">Sélectionnez une région</option>
+                  <option value="DAKAR">Dakar</option>
+                  <option value="THIES">Thiès</option>
+                  <option value="DIOURBEL">Diourbel</option>
+                  <option value="FATICK">Fatick</option>
+                  <option value="KAOLACK">Kaolack</option>
+                  <option value="KOLDA">Kolda</option>
+                  <option value="LOUGA">Louga</option>
+                  <option value="MATAM">Matam</option>
+                  <option value="SAINT_LOUIS">Saint-Louis</option>
+                  <option value="SEDHIOU">Sédhiou</option>
+                  <option value="TAMBACOUNDA">Tambacounda</option>
+                  <option value="ZIGUINCHOR">Ziguinchor</option>
+                  <option value="KAFFRINE">Kaffrine</option>
+                  <option value="KEDOUGOU">Kédougou</option>
+                </select>
               </div>
               <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">Longitude</label>
-                <input
-                  type="number"
-                  step="0.000001"
-                  name="longitude"
-                  value={formData.longitude ?? ''}
+                <label className="block text-base font-medium text-gray-700 mb-2">Département</label>
+                <select
+                  name="departement"
+                  value={formData.departement}
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
-                  placeholder="-17.4441"
-                />
+                >
+                  <option value="">Sélectionnez un département</option>
+                  <option value="DAKAR">Dakar</option>
+                  <option value="GUEDIAWAYE">Guédiawaye</option>
+                  <option value="PIKINE">Pikine</option>
+                  <option value="RUFISQUE">Rufisque</option>
+                  <option value="THIES">Thiès</option>
+                  <option value="MBOUR">M'bour</option>
+                  <option value="TIVAOUANE">Tivaouane</option>
+                  <option value="SAINT_LOUIS">Saint-Louis</option>
+                  <option value="DAGANA">Dagana</option>
+                  <option value="PODOR">Podor</option>
+                  <option value="ZIGUINCHOR">Ziguinchor</option>
+                  <option value="BIGNONA">Bignona</option>
+                  <option value="OUSSOUYE">Oussouye</option>
+                  <option value="KAOLACK">Kaolack</option>
+                  <option value="GUINGUINEO">Guinguinéo</option>
+                  <option value="NIORO">Nioro du Rip</option>
+                  <option value="KOLDA">Kolda</option>
+                  <option value="MEDINA_YORO_FOULA">Médina Yoro Foulah</option>
+                  <option value="VELINGARA">Vélingara</option>
+                  <option value="LOUGA">Louga</option>
+                  <option value="KEBEMER">Kébémer</option>
+                  <option value="LINGUERE">Linguère</option>
+                  <option value="MATAM">Matam</option>
+                  <option value="KANEL">Kanel</option>
+                  <option value="RANEROU">Ranérou</option>
+                  <option value="SEDHIOU">Sédhiou</option>
+                  <option value="BOUNKILING">Bounkiling</option>
+                  <option value="GOUDOMP">Goudomp</option>
+                  <option value="TAMBACOUNDA">Tambacounda</option>
+                  <option value="BAKEL">Bakel</option>
+                  <option value="GOUDIRY">Goudiry</option>
+                  <option value="KOUMPENTOUM">Koumpentoum</option>
+                  <option value="KAFFRINE">Kaffrine</option>
+                  <option value="BIRKILANE">Birkilane</option>
+                  <option value="MALEM_HODAR">Malem Hodar</option>
+                  <option value="KEDOUGOU">Kédougou</option>
+                  <option value="SALEMATA">Salémata</option>
+                  <option value="SARAYA">Saraya</option>
+                </select>
               </div>
             </div>
           </div>

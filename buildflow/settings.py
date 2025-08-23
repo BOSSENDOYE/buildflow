@@ -1,25 +1,14 @@
-<<<<<<< HEAD
 import os
 from decouple import config, Csv
-=======
->>>>>>> 7ddd56f5fd0354e2af1a87a084e274e8a2552934
-
-import os
 from datetime import timedelta
 
 # === BASE DIR ===
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-<<<<<<< HEAD
+# === SÉCURITÉ ===
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-buildflow-2024-secret-key-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
-=======
-# === SÉCURITÉ ===
-SECRET_KEY = 'django-insecure-buildflow-2024-secret-key-change-in-production'
-DEBUG = True
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
->>>>>>> 7ddd56f5fd0354e2af1a87a084e274e8a2552934
 
 # === APPLICATIONS ===
 INSTALLED_APPS = [
@@ -76,7 +65,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'buildflow.wsgi.application'
 
-<<<<<<< HEAD
 # Configuration base de données via variables d'environnement
 DB_ENGINE = config('DB_ENGINE', default='sqlite').lower()
 
@@ -101,13 +89,6 @@ else:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
         }
-=======
-# === BASE DE DONNÉES (SQLite) ===
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
->>>>>>> 7ddd56f5fd0354e2af1a87a084e274e8a2552934
     }
 
 # === VALIDATEURS DE MOT DE PASSE ===

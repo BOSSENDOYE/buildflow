@@ -14,8 +14,9 @@ export interface Project {
   membres: number[];
   // Nouveaux champs
   nom_entreprise?: string;
-  latitude?: number;
-  longitude?: number;
+  region?: string;
+  departement?: string;
+  etape_actuelle?: 'PREPARATION' | 'FONDATIONS' | 'GROS_OEUVRE' | 'SECOND_OEUVRE' | 'FINITIONS' | 'AMENAGEMENT' | 'RECEPTION' | '';
   date_creation: string;
   date_modification: string;
 }

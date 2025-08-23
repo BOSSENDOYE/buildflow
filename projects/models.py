@@ -9,6 +9,100 @@ class Projet(models.Model):
         ('ANNULE', 'Annulé'),
     )
     
+    # Choix pour les étapes/phase de construction
+    ETAPE_CHOICES = (
+        ('', '---------'),
+        ('PREPARATION', 'Préparation du terrain'),
+        ('FONDATIONS', 'Fondations'),
+        ('GROS_OEUVRE', 'Gros œuvre'),
+        ('SECOND_OEUVRE', 'Second œuvre'),
+        ('FINITIONS', 'Finitions'),
+        ('AMENAGEMENT', 'Aménagement extérieur'),
+        ('RECEPTION', 'Réception des travaux'),
+    )
+    
+    # Choix pour les régions du Sénégal
+    REGION_CHOICES = (
+        ('', '---------'),
+        ('DAKAR', 'Dakar'),
+        ('THIES', 'Thiès'),
+        ('DIOURBEL', 'Diourbel'),
+        ('FATICK', 'Fatick'),
+        ('KAOLACK', 'Kaolack'),
+        ('KOLDA', 'Kolda'),
+        ('LOUGA', 'Louga'),
+        ('MATAM', 'Matam'),
+        ('SAINT_LOUIS', 'Saint-Louis'),
+        ('SEDHIOU', 'Sédhiou'),
+        ('TAMBACOUNDA', 'Tambacounda'),
+        ('ZIGUINCHOR', 'Ziguinchor'),
+        ('KAFFRINE', 'Kaffrine'),
+        ('KEDOUGOU', 'Kédougou'),
+    )
+    
+    # Choix pour les départements du Sénégal
+    DEPARTEMENT_CHOICES = (
+        ('', '---------'),
+        # Dakar
+        ('DAKAR', 'Dakar'),
+        ('GUEDIAWAYE', 'Guédiawaye'),
+        ('PIKINE', 'Pikine'),
+        ('RUFISQUE', 'Rufisque'),
+        # Thiès
+        ('THIES', 'Thiès'),
+        ('MBOUR', 'M\'bour'),
+        ('TIVAOUANE', 'Tivaouane'),
+        # Diourbel
+        ('DIOURBEL', 'Diourbel'),
+        ('BAMBEY', 'Bambey'),
+        ('MBACKE', 'Mbacké'),
+        # Fatick
+        ('FATICK', 'Fatick'),
+        ('FOUNDIOUGNE', 'Foundiougne'),
+        ('GOSSAS', 'Gossas'),
+        # Kaolack
+        ('KAOLACK', 'Kaolack'),
+        ('GUINGUINEO', 'Guinguinéo'),
+        ('NIORO', 'Nioro du Rip'),
+        # Kolda
+        ('KOLDA', 'Kolda'),
+        ('MEDINA_YORO_FOULA', 'Médina Yoro Foulah'),
+        ('VELINGARA', 'Vélingara'),
+        # Louga
+        ('LOUGA', 'Louga'),
+        ('KEBEMER', 'Kébémer'),
+        ('LINGUERE', 'Linguère'),
+        # Matam
+        ('MATAM', 'Matam'),
+        ('KANEL', 'Kanel'),
+        ('RANEROU', 'Ranérou'),
+        # Saint-Louis
+        ('SAINT_LOUIS', 'Saint-Louis'),
+        ('DAGANA', 'Dagana'),
+        ('PODOR', 'Podor'),
+        # Sédhiou
+        ('SEDHIOU', 'Sédhiou'),
+        ('BOUNKILING', 'Bounkiling'),
+        ('GOUDOMP', 'Goudomp'),
+        # Tambacounda
+        ('TAMBACOUNDA', 'Tambacounda'),
+        ('BAKEL', 'Bakel'),
+        ('GOUDIRY', 'Goudiry'),
+        ('KOUMPENTOUM', 'Koumpentoum'),
+        # Ziguinchor
+        ('ZIGUINCHOR', 'Ziguinchor'),
+        ('BIGNONA', 'Bignona'),
+        ('OUSSOUYE', 'Oussouye'),
+        # Kaffrine
+        ('KAFFRINE', 'Kaffrine'),
+        ('BIRKILANE', 'Birkilane'),
+        ('MALEM_HODAR', 'Malem Hodar'),
+        # Kédougou
+        ('KEDOUGOU', 'Kédougou'),
+        ('SALEMATA', 'Salémata'),
+        ('SARAYA', 'Saraya'),
+    )
+    
     nom = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     date_debut = models.DateField()
@@ -19,8 +113,9 @@ class Projet(models.Model):
     budget_reel = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     # Nouvelles informations demandées
     nom_entreprise = models.CharField(max_length=255, blank=True)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    region = models.CharField(max_length=20, choices=REGION_CHOICES, blank=True)
+    departement = models.CharField(max_length=30, choices=DEPARTEMENT_CHOICES, blank=True)
+    etape_actuelle = models.CharField(max_length=20, choices=ETAPE_CHOICES, blank=True)
     chef_projet = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='projets_diriges')
     membres = models.ManyToManyField(User, related_name='projets_participes', blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)

@@ -70,9 +70,18 @@ const PrivateDashboard: React.FC = () => {
         setProjects(projectsData);
       } catch (error) {
         console.error('Error loading data:', error);
-        // En cas d'erreur, on garde les listes vides
+        // En cas d'erreur, on garde les listes vides mais on restaure des permissions par défaut
         setProjects([]);
-        setUserPermissions(null);
+        // Permissions par défaut pour permettre l'utilisation de l'interface
+        const defaultPermissions = {
+          peut_creer_projet: true,
+          peut_modifier_projet: true,
+          peut_supprimer_projet: false,
+          peut_gerer_utilisateurs: false,
+          peut_voir_analytics: true,
+          peut_exporter_donnees: true,
+        };
+        setUserPermissions(defaultPermissions);
       } finally {
         setIsLoading(false);
       }
