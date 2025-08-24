@@ -18,6 +18,7 @@ class ProjetViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filtrer les projets selon les permissions de l'utilisateur"""
         user = self.request.user
+        
         if hasattr(user, 'profilutilisateur'):
             if user.profilutilisateur.role == 'ADMINISTRATEUR':
                 return Projet.objects.all()
@@ -157,6 +158,7 @@ class PublicProjetViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Projet.objects.all()
     serializer_class = ProjetSerializer
     permission_classes = [AllowAny]
+    authentication_classes = []  # Disable authentication for this viewset
     
     def get_queryset(self):
         """Retourner tous les projets publics avec informations limitées"""
@@ -198,11 +200,9 @@ class PublicProjetViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 progression = 0
             
-            # Ajouter les coordonnées géographiques (à adapter selon votre modèle)
-            # Pour l'exemple, on utilise des coordonnées par défaut
+            # Enrichir les données pour la carte
             project_data['progression'] = progression
-            project_data['latitude'] = 14.7167  # Coordonnées par défaut du Sénégal
-            project_data['longitude'] = -17.4677
+            # Remove latitude and longitude fields
             
             projects_data.append(project_data)
         
