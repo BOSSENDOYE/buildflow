@@ -1,44 +1,40 @@
-# Plan de remplacement Latitude/Longitude par Région/Département
+# Plan de correction des fonctionnalités de modification/suppression de projet
 
 ## Étapes à compléter:
 
-### 1. ✅ Analyse du code existant (COMPLET)
-- [x] Examiner le modèle Projet dans `projects/models.py`
-- [x] Examiner l'interface Project dans `projectService.ts`
-- [x] Examiner le composant ProjectModals dans `ProjectModals.tsx`
+### ✅ Étape 1: Analyse des fichiers existants
+- [x] Examiner le backend (views.py) - Les méthodes update et destroy existent
+- [x] Examiner le frontend (PrivateDashboard.tsx, ProjectModals.tsx) - Les composants existent mais ne fonctionnent pas
+- [x] Vérifier les services API (projectService.ts, api.ts) - Les appels sont configurés
+- [x] Vérifier la configuration (settings.py, urls.py) - CORS et routes sont corrects
 
-### 2. ✅ Backend Changes (COMPLET)
-- [x] Modifier `projects/models.py` pour ajouter région/département
-- [x] Créer une nouvelle migration Django
+### 🔄 Étape 2: Améliorer la gestion d'erreurs dans PrivateDashboard
+- [ ] Ajouter des logs d'erreur détaillés dans handleEditProject
+- [ ] Ajouter des logs d'erreur détaillés dans handleDeleteProject
+- [ ] Améliorer les messages d'erreur pour l'utilisateur
 
-### 3. ✅ Frontend Changes (COMPLET)
-- [x] Modifier `projectService.ts` pour mettre à jour l'interface Project
-- [x] Modifier `ProjectModals.tsx` pour remplacer les champs géolocalisation
+### 🔄 Étape 3: Compléter le formulaire d'édition dans ProjectModals
+- [ ] Ajouter tous les champs manquants (région, département, etc.)
+- [ ] S'assurer que les données sont correctement pré-remplies
+- [ ] Uniformiser le style avec le formulaire de création
 
-### 4. Testing
-- [ ] Tester le formulaire de création de projet
-- [ ] Vérifier la persistance des données
+### 🔄 Étape 4: Vérifier les permissions utilisateur
+- [ ] Examiner le modèle utilisateur pour les permissions
+- [ ] Tester avec un utilisateur administrateur
 
-## Détails des régions/départements du Sénégal à implémenter:
+### 🔄 Étape 5: Testing et validation
+- [ ] Tester la modification de projet
+- [ ] Tester la suppression de projet
+- [ ] Vérifier les logs du navigateur pour les erreurs
 
-Régions principales du Sénégal:
-- Dakar
-- Thiès
-- Diourbel
-- Fatick
-- Kaolack
-- Kolda
-- Louga
-- Matam
-- Saint-Louis
-- Sédhiou
-- Tambacounda
-- Ziguinchor
-- Kaffrine
-- Kédougou
+## Problèmes identifiés:
+1. Gestion d'erreurs insuffisante dans les handlers
+2. Formulaire d'édition incomplet (manque région, département, etc.)
+3. Messages d'erreur génériques non informatifs
+4. Besoin de tester avec les bonnes permissions utilisateur
 
-Départements par région (exemples):
-- Dakar: Dakar, Guédiawaye, Pikine, Rufisque
-- Thiès: Thiès, M'bour, Tivaouane
-- Saint-Louis: Saint-Louis, Dagana, Podor
-- etc.
+## Priorité:
+1. ✅ Analyse complète
+2. 🔄 Amélioration de la gestion d'erreurs
+3. 🔄 Complétion des formulaires
+4. 🔄 Testing avec permissions

@@ -1,14 +1,22 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import models
-from .models import Projet, Risque, Phase, Budget, Action, Notification, Commentaire, AuditLog
+from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q, Count, Sum, Avg
+from django.utils import timezone
+from datetime import datetime, timedelta
+import json
+
+from .models import Projet, Risque, Phase, Budget, Action, Notification, Commentaire, AuditLog, AuditTrail
 from .serializers import (
     ProjetSerializer, RisqueSerializer, PhaseSerializer, BudgetSerializer,
-    ActionSerializer, NotificationSerializer, CommentaireSerializer, AuditLogSerializer
+    ActionSerializer, NotificationSerializer, CommentaireSerializer, AuditLogSerializer,
+    AuditTrailSerializer, AuditTrailListSerializer
 )
 from .utils import create_audit_log
+from .services import ProjectExportService
 
 class ProjetViewSet(viewsets.ModelViewSet):
     queryset = Projet.objects.all()
@@ -207,3 +215,235 @@ class PublicProjetViewSet(viewsets.ReadOnlyModelViewSet):
             projects_data.append(project_data)
         
         return Response(projects_data)
+
+class AuditTrailViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet pour la traçabilité et l'audit"""
+    
+    queryset = AuditTrail.objects.all()
+    serializer_class = AuditTrailListSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['action', 'resource_type', 'user', 'projet']
+    search_fields = ['resource_name', 'description', 'user__username']
+    ordering_fields = ['timestamp', 'action', 'resource_type']
+    ordering = ['-timestamp']
+    
+    def get_queryset(self):
+        """Filtrer les audits selon les permissions de l'utilisateur"""
+        queryset = super().get_queryset()
+        
+        # Si l'utilisateur n'est pas admin, filtrer par ses projets
+        if not self.request.user.is_staff:
+            user_projects = Projet.objects.filter(
+                Q(chef_projet=self.request.user) | Q(membres=self.request.user)
+            ).distinct()
+            queryset = queryset.filter(projet__in=user_projects)
+        
+        return queryset
+    
+    @action(detail=False, methods=['get'])
+    def project_history(self, request):
+        """Récupérer l'historique complet d'un projet"""
+        projet_id = request.query_params.get('projet_id')
+        if not projet_id:
+            return Response(
+                {'error': 'ID du projet requis'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            projet = Projet.objects.get(id=projet_id)
+            
+            # Vérifier les permissions
+            if not (request.user.is_staff or 
+                   projet.chef_projet == request.user or 
+                   request.user in projet.membres.all()):
+                return Response(
+                    {'error': 'Accès non autorisé'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Récupérer tous les audits liés au projet
+            audits = AuditTrail.objects.filter(projet=projet).order_by('-timestamp')
+            
+            # Grouper par type de ressource
+            grouped_audits = {}
+            for audit in audits:
+                resource_type = audit.resource_type
+                if resource_type not in grouped_audits:
+                    grouped_audits[resource_type] = []
+                grouped_audits[resource_type].append(AuditTrailSerializer(audit).data)
+            
+            # Statistiques
+            stats = {
+                'total_actions': audits.count(),
+                'actions_by_type': audits.values('action').annotate(count=Count('id')),
+                'actions_by_resource': audits.values('resource_type').annotate(count=Count('id')),
+                'actions_by_user': audits.values('user__username').annotate(count=Count('id')),
+                'recent_activity': audits.filter(
+                    timestamp__gte=timezone.now() - timedelta(days=7)
+                ).count()
+            }
+            
+            return Response({
+                'projet': {
+                    'id': projet.id,
+                    'nom': projet.nom,
+                    'statut': projet.statut
+                },
+                'statistiques': stats,
+                'historique_par_type': grouped_audits,
+                'historique_complet': AuditTrailSerializer(audits, many=True).data
+            })
+            
+        except Projet.DoesNotExist:
+            return Response(
+                {'error': 'Projet non trouvé'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['get'])
+    def user_activity(self, request):
+        """Récupérer l'activité d'un utilisateur"""
+        user_id = request.query_params.get('user_id', request.user.id)
+        
+        # Vérifier les permissions
+        if str(user_id) != str(request.user.id) and not request.user.is_staff:
+            return Response(
+                {'error': 'Accès non autorisé'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Récupérer l'activité de l'utilisateur
+        audits = AuditTrail.objects.filter(user_id=user_id).order_by('-timestamp')
+        
+        # Statistiques par période
+        now = timezone.now()
+        periods = {
+            'aujourd_hui': audits.filter(timestamp__date=now.date()).count(),
+            'cette_semaine': audits.filter(timestamp__gte=now - timedelta(days=7)).count(),
+            'ce_mois': audits.filter(timestamp__gte=now - timedelta(days=30)).count(),
+            'total': audits.count()
+        }
+        
+        # Actions par type
+        actions_by_type = audits.values('action').annotate(count=Count('id'))
+        
+        # Projets sur lesquels l'utilisateur a travaillé
+        projets_actifs = audits.values('projet__nom', 'projet__id').distinct()
+        
+        return Response({
+            'utilisateur': {
+                'id': request.user.id,
+                'username': request.user.username
+            },
+            'statistiques': periods,
+            'actions_par_type': actions_by_type,
+            'projets_actifs': projets_actifs,
+            'activite_recente': AuditTrailListSerializer(audits[:50], many=True).data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def system_overview(self, request):
+        """Vue d'ensemble de l'activité du système (admin seulement)"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Accès réservé aux administrateurs'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        now = timezone.now()
+        
+        # Statistiques globales
+        stats = {
+            'total_actions': AuditTrail.objects.count(),
+            'actions_aujourd_hui': AuditTrail.objects.filter(
+                timestamp__date=now.date()
+            ).count(),
+            'actions_cette_semaine': AuditTrail.objects.filter(
+                timestamp__gte=now - timedelta(days=7)
+            ).count(),
+            'utilisateurs_actifs': AuditTrail.objects.filter(
+                timestamp__gte=now - timedelta(days=7)
+            ).values('user').distinct().count(),
+            'projets_actifs': AuditTrail.objects.filter(
+                timestamp__gte=now - timedelta(days=7)
+            ).values('projet').distinct().count()
+        }
+        
+        # Actions par type
+        actions_by_type = AuditTrail.objects.values('action').annotate(count=Count('id'))
+        
+        # Activité par ressource
+        activity_by_resource = AuditTrail.objects.values('resource_type').annotate(count=Count('id'))
+        
+        # Utilisateurs les plus actifs
+        top_users = AuditTrail.objects.values('user__username').annotate(
+            count=Count('id')
+        ).order_by('-count')[:10]
+        
+        return Response({
+            'statistiques_globales': stats,
+            'actions_par_type': actions_by_type,
+            'activite_par_ressource': activity_by_resource,
+            'utilisateurs_plus_actifs': top_users
+        })
+    
+    @action(detail=False, methods=['get'])
+    def export_audit(self, request):
+        """Exporter les données d'audit (admin seulement)"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Accès réservé aux administrateurs'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Paramètres de filtrage
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        action_type = request.query_params.get('action')
+        resource_type = request.query_params.get('resource_type')
+        
+        queryset = self.get_queryset()
+        
+        # Appliquer les filtres
+        if start_date:
+            queryset = queryset.filter(timestamp__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(timestamp__lte=end_date)
+        if action_type:
+            queryset = queryset.filter(action=action_type)
+        if resource_type:
+            queryset = queryset.filter(resource_type=resource_type)
+        
+        # Limiter le nombre de résultats pour l'export
+        queryset = queryset[:10000]  # Max 10k enregistrements
+        
+        # Préparer les données pour l'export
+        export_data = []
+        for audit in queryset:
+            export_data.append({
+                'Date': audit.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'Action': audit.get_action_display(),
+                'Utilisateur': audit.user.username if audit.user else 'Système',
+                'Type_Ressource': audit.resource_type,
+                'Nom_Ressource': audit.resource_name,
+                'ID_Ressource': audit.resource_id,
+                'Projet': audit.projet.nom if audit.projet else 'N/A',
+                'Description': audit.description,
+                'IP': audit.ip_address or 'N/A',
+                'Données_Avant': json.dumps(audit.data_before) if audit.data_before else 'N/A',
+                'Données_Après': json.dumps(audit.data_after) if audit.data_after else 'N/A'
+            })
+        
+        return Response({
+            'message': f'Export de {len(export_data)} enregistrements',
+            'total_records': len(export_data),
+            'filtres_appliques': {
+                'start_date': start_date,
+                'end_date': end_date,
+                'action': action_type,
+                'resource_type': resource_type
+            },
+            'donnees': export_data
+        })

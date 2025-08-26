@@ -67,6 +67,7 @@ export interface User {
   first_name: string;
   last_name: string;
   role: string;
+  is_active: boolean;
 }
 
 export interface UpdateRoleResponse {
@@ -198,7 +199,15 @@ class AuthService {
   async listAllUsers(): Promise<User[]> {
     try {
       const response = await api.get('/users/users/');
-      const apiUsers = response.data as any[];
+      const apiUsers = response.data as Array<{
+        id: number;
+        username: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        role: string;
+        actif?: boolean;
+      }>;
       return apiUsers.map((u) => ({
         id: u.id,
         username: u.username,

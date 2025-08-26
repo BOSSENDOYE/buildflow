@@ -1,29 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, Settings, Edit, Trash2, Plus, X, CheckCircle, AlertTriangle } from 'lucide-react';
-import authService from '../services/authService';
+import { Shield, Settings, Edit, Plus, X, CheckCircle, AlertTriangle } from 'lucide-react';
+import authService, { User, RoleOption } from '../services/authService';
 
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  role: string;
-  is_active: boolean;
-}
-
-interface Role {
-  id: number;
-  name: string;
-  permissions: {
-    peut_creer_projet: boolean;
-    peut_modifier_projet: boolean;
-    peut_supprimer_projet: boolean;
-    peut_gerer_utilisateurs: boolean;
-    peut_voir_analytics: boolean;
-    peut_exporter_donnees: boolean;
-  };
-}
+type Role = RoleOption;
 
 const UserProfileManager: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -50,17 +29,18 @@ const UserProfileManager: React.FC = () => {
       ]);
       
       setUsers(usersData);
-      setRoles(Array.isArray(rolesOptions) ? rolesOptions as any : []);
-    } catch (error: any) {
+      setRoles(Array.isArray(rolesOptions) ? rolesOptions as Role[] : []);
+    } catch (error: unknown) {
       console.error('Error loading data:', error);
       // Afficher une erreur explicite à l'utilisateur
-      const status = error?.response?.status;
+      const axiosError = error as { response?: { status?: number; data?: { message?: string } } };
+      const status = axiosError.response?.status || 0;
       if (status === 401) {
         setError("Session expirée ou non authentifiée. Veuillez vous reconnecter.");
       } else if (status === 403) {
         setError("Accès refusé. Cette page est réservée aux administrateurs.");
       } else {
-        setError(error?.response?.data?.message || 'Impossible de charger les données des utilisateurs.');
+        setError(axiosError.response?.data?.message || 'Impossible de charger les données des utilisateurs.');
       }
       // Données de test
       setUsers([
@@ -164,7 +144,14 @@ const UserProfileManager: React.FC = () => {
 
   const getRolePermissions = (roleName: string) => {
     const role = roles.find(r => r.name === roleName);
-    return role?.permissions || {};
+    return role?.permissions || {
+      peut_creer_projet: false,
+      peut_modifier_projet: false,
+      peut_supprimer_projet: false,
+      peut_gerer_utilisateurs: false,
+      peut_voir_analytics: false,
+      peut_exporter_donnees: false,
+    };
   };
 
   if (isLoading) {
@@ -405,12 +392,20 @@ const UserProfileManager: React.FC = () => {
                 onClick={async () => {
                   try {
                     setError('');
-                    const created = await authService.createUser(newUser as any);
+                    const created = await authService.createUser({
+                      username: newUser.username,
+                      email: newUser.email,
+                      first_name: newUser.first_name,
+                      last_name: newUser.last_name,
+                      password: newUser.password,
+                      role: newUser.role
+                    });
                     setUsers(prev => [...prev, created]);
                     setShowCreateModal(false);
                     setNewUser({ username: '', email: '', first_name: '', last_name: '', password: '', role: 'GESTIONNAIRE' });
-                  } catch (e: any) {
-                    setError(e?.response?.data?.message || 'Erreur lors de la création');
+                  } catch (e: unknown) {
+                    const axiosError = e as { response?: { data?: { message?: string } } };
+                    setError(axiosError.response?.data?.message || 'Erreur lors de la création');
                   }
                 }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

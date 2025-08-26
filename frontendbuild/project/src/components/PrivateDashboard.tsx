@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Users, Calendar, TrendingUp, FileText, AlertTriangle, CheckCircle2, Clock, DollarSign, Menu, X, Bell, Search, Plus, Filter, Download, Eye, Edit, Trash2, Settings, LogOut, Shield, Zap, Brain, Target, BarChart3, Activity, Lightbulb, ArrowRight, Globe } from 'lucide-react';
+import { Building2, Users, Calendar, TrendingUp, FileText, AlertTriangle, CheckCircle2, Menu, X, Bell, Search, Plus, Filter, Download, Eye, Edit, Trash2, Settings, LogOut, Shield, Brain, BarChart3, Activity } from 'lucide-react';
 import ProjectPhasesView from './ProjectPhasesView';
 import DocumentsPanel from './DocumentsPanel';
 import AuditPanel from './AuditPanel';
@@ -44,9 +44,16 @@ const PrivateDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [projects, setProjects] = useState<Project[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>(mockRecommendations);
+  const [recommendations] = useState<Recommendation[]>(mockRecommendations);
   const [isLoading, setIsLoading] = useState(true);
-  const [userPermissions, setUserPermissions] = useState<any>(null);
+  const [userPermissions, setUserPermissions] = useState<{
+    peut_creer_projet: boolean;
+    peut_modifier_projet: boolean;
+    peut_supprimer_projet: boolean;
+    peut_gerer_utilisateurs: boolean;
+    peut_voir_analytics: boolean;
+    peut_exporter_donnees: boolean;
+  } | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -255,8 +262,34 @@ const PrivateDashboard: React.FC = () => {
       setProjects(prev => prev.map(p => p.id === selectedProject.id ? updatedProject : p));
       setShowEditModal(false);
       setSelectedProject(null);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error updating project:', error);
+      
+      // Gestion d'erreur détaillée
+      let errorMessage = 'Une erreur est survenue lors de la modification du projet.';
+      
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { status: number; data?: { message?: string } } };
+        const status = axiosError.response?.status;
+        const data = axiosError.response?.data;
+        
+        if (status === 403) {
+          errorMessage = 'Vous n\'avez pas les permissions nécessaires pour modifier ce projet.';
+        } else if (status === 404) {
+          errorMessage = 'Le projet que vous essayez de modifier n\'existe pas.';
+        } else if (status === 400 && data?.message) {
+          errorMessage = data.message;
+        } else if (status === 400) {
+          errorMessage = 'Données invalides. Veuillez vérifier les informations saisies.';
+        } else if (status && status >= 500) {
+          errorMessage = 'Erreur serveur. Veuillez réessayer plus tard.';
+        }
+      } else if (error && typeof error === 'object' && 'request' in error) {
+        // Pas de réponse du serveur
+        errorMessage = 'Impossible de contacter le serveur. Vérifiez votre connexion internet.';
+      }
+      
+      alert(errorMessage);
       throw error;
     }
   };
@@ -269,8 +302,32 @@ const PrivateDashboard: React.FC = () => {
       setProjects(prev => prev.filter(p => p.id !== selectedProject.id));
       setShowDeleteModal(false);
       setSelectedProject(null);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error deleting project:', error);
+      
+      // Gestion d'erreur détaillée
+      let errorMessage = 'Une erreur est survenue lors de la suppression du projet.';
+      
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { status: number; data?: { message?: string } } };
+        const status = axiosError.response?.status;
+        const data = axiosError.response?.data;
+        
+        if (status === 403) {
+          errorMessage = 'Vous n\'avez pas les permissions nécessaires pour supprimer ce projet.';
+        } else if (status === 404) {
+          errorMessage = 'Le projet que vous essayez de supprimer n\'existe pas.';
+        } else if (status === 400 && data?.message) {
+          errorMessage = data.message;
+        } else if (status && status >= 500) {
+          errorMessage = 'Erreur serveur. Veuillez réessayer plus tard.';
+        }
+      } else if (error && typeof error === 'object' && 'request' in error) {
+        // Pas de réponse du serveur
+        errorMessage = 'Impossible de contacter le serveur. Vérifiez votre connexion internet.';
+      }
+      
+      alert(errorMessage);
       throw error;
     }
   };
@@ -609,7 +666,7 @@ const PrivateDashboard: React.FC = () => {
       case 'dashboard': return renderDashboard();
       case 'projects': return renderProjects();
       case 'phases': return <ProjectPhasesView projectId={selectedProject?.id ?? null} />;
-      case 'documents': return <DocumentsPanel project={selectedProject || projects[0] || null} />;
+      case 'documents': return <DocumentsPanel project={selectedProject || projects[0] || null} allProjects={projects} />;
       case 'audit': return <AuditPanel project={selectedProject || projects[0] || null} />;
       case 'analytics': return userPermissions?.peut_voir_analytics ? (
         <>
@@ -671,7 +728,7 @@ const PrivateDashboard: React.FC = () => {
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => setActiveView(id as any)}
+                onClick={() => setActiveView(id as 'dashboard' | 'projects' | 'phases' | 'documents' | 'analytics' | 'users' | 'audit')}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                   activeView === id
                     ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
