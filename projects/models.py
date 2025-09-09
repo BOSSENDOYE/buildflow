@@ -174,6 +174,8 @@ class Phase(models.Model):
     date_fin_reelle = models.DateField(null=True, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='EN_ATTENTE')
     ordre = models.IntegerField(default=0)
+    responsable = models.CharField(max_length=255, blank=True, help_text="Nom de la personne responsable de cette phase")
+    responsable_telephone = models.CharField(max_length=20, blank=True, help_text="Numéro de téléphone du responsable (ex: +221 77 123 45 67)")
     
     def __str__(self):
         return f"{self.projet.nom} - {self.nom}"

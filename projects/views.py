@@ -8,6 +8,8 @@ from django.db.models import Q, Count, Sum, Avg
 from django.utils import timezone
 from datetime import datetime, timedelta
 import json
+from rest_framework.exceptions import PermissionDenied
+from rest_framework import serializers
 
 from .models import Projet, Risque, Phase, Budget, Action, Notification, Commentaire, AuditLog, AuditTrail
 from .serializers import (
@@ -125,9 +127,324 @@ class RisqueViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 class PhaseViewSet(viewsets.ModelViewSet):
+    """ViewSet pour la gestion des phases par projet"""
     queryset = Phase.objects.all()
     serializer_class = PhaseSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['projet', 'statut']
+    search_fields = ['nom', 'description']
+    ordering_fields = ['ordre', 'date_debut', 'date_fin_prevue']
+    ordering = ['ordre', 'date_debut']
+    
+    def get_queryset(self):
+        """Filtrer les phases selon les permissions de l'utilisateur et le projet"""
+        queryset = super().get_queryset()
+        user = self.request.user
+        
+        # Filtrer par projet si spécifié
+        projet_id = self.request.query_params.get('projet')
+        if projet_id:
+            try:
+                projet = Projet.objects.get(id=projet_id)
+                # Vérifier les permissions sur ce projet
+                if not (user.is_staff or 
+                       projet.chef_projet == user or 
+                       user in projet.membres.all()):
+                    return Phase.objects.none()  # Aucun accès
+                queryset = queryset.filter(projet=projet)
+            except Projet.DoesNotExist:
+                return Phase.objects.none()
+        else:
+            # Si aucun projet spécifié, filtrer par les projets de l'utilisateur
+            if not user.is_staff:
+                user_projects = Projet.objects.filter(
+                    Q(chef_projet=user) | Q(membres=user)
+                ).distinct()
+                queryset = queryset.filter(projet__in=user_projects)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Créer une phase avec vérification des permissions"""
+        projet_id = self.request.data.get('projet')
+        if not projet_id:
+            raise serializers.ValidationError("L'ID du projet est requis")
+        
+        try:
+            projet = Projet.objects.get(id=projet_id)
+            user = self.request.user
+            
+            # Vérifier les permissions
+            if not (user.is_staff or 
+                   projet.chef_projet == user or 
+                   user in projet.membres.all()):
+                raise PermissionDenied("Vous n'avez pas les permissions pour créer des phases dans ce projet")
+            
+            # Vérifier que l'ordre est unique dans le projet
+            ordre = serializer.validated_data.get('ordre', 0)
+            if Phase.objects.filter(projet=projet, ordre=ordre).exists():
+                # Trouver le prochain ordre disponible
+                next_ordre = Phase.objects.filter(projet=projet).aggregate(
+                    models.Max('ordre')
+                )['ordre__max'] or 0
+                serializer.validated_data['ordre'] = next_ordre + 1
+            
+            # Créer la phase
+            phase = serializer.save(projet=projet)
+            
+            # Enregistrer l'action dans l'audit
+            try:
+                from .services import AuditService
+                AuditService.log_action(
+                    action='CREATE',
+                    user=user,
+                    resource=phase,
+                    description=f"Création de la phase '{phase.nom}'",
+                    projet=projet,
+                    request=self.request
+                )
+            except Exception:
+                pass  # Ne pas faire échouer la création si l'audit échoue
+            
+            return phase
+            
+        except Projet.DoesNotExist:
+            raise serializers.ValidationError("Projet non trouvé")
+    
+    def perform_update(self, serializer):
+        """Modifier une phase avec vérification des permissions"""
+        phase = self.get_object()
+        user = self.request.user
+        
+        # Vérifier les permissions
+        if not (user.is_staff or 
+               phase.projet.chef_projet == user or 
+               user in phase.projet.membres.all()):
+            raise PermissionDenied("Vous n'avez pas les permissions pour modifier cette phase")
+        
+        # Sauvegarder les données avant modification pour l'audit
+        data_before = {
+            'nom': phase.nom,
+            'description': phase.description,
+            'date_debut': str(phase.date_debut),
+            'date_fin_prevue': str(phase.date_fin_prevue),
+            'statut': phase.statut,
+            'ordre': phase.ordre
+        }
+        
+        # Mettre à jour la phase
+        updated_phase = serializer.save()
+        
+        # Enregistrer l'action dans l'audit
+        try:
+            from .services import AuditService
+            AuditService.log_action(
+                action='UPDATE',
+                user=user,
+                resource=updated_phase,
+                description=f"Modification de la phase '{updated_phase.nom}'",
+                data_before=data_before,
+                data_after={
+                    'nom': updated_phase.nom,
+                    'description': updated_phase.description,
+                    'date_debut': str(updated_phase.date_debut),
+                    'date_fin_prevue': str(updated_phase.date_fin_prevue),
+                    'statut': updated_phase.statut,
+                    'ordre': updated_phase.ordre
+                },
+                projet=updated_phase.projet,
+                request=self.request
+            )
+        except Exception:
+            pass  # Ne pas faire échouer la modification si l'audit échoue
+        
+        return updated_phase
+    
+    def perform_destroy(self, instance):
+        """Supprimer une phase avec vérification des permissions"""
+        user = self.request.user
+        
+        # Vérifier les permissions
+        if not (user.is_staff or 
+               instance.projet.chef_projet == user or 
+               user in instance.projet.membres.all()):
+            raise PermissionDenied("Vous n'avez pas les permissions pour supprimer cette phase")
+        
+        # Enregistrer l'action dans l'audit avant suppression
+        try:
+            from .services import AuditService
+            AuditService.log_action(
+                action='DELETE',
+                user=user,
+                resource=instance,
+                description=f"Suppression de la phase '{instance.nom}'",
+                projet=instance.projet,
+                request=self.request
+            )
+        except Exception:
+            pass  # Ne pas faire échouer la suppression si l'audit échoue
+        
+        # Supprimer la phase
+        instance.delete()
+    
+    @action(detail=False, methods=['get'])
+    def project_phases(self, request):
+        """Récupérer toutes les phases d'un projet spécifique"""
+        projet_id = request.query_params.get('projet_id')
+        if not projet_id:
+            return Response(
+                {'error': 'ID du projet requis'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            projet = Projet.objects.get(id=projet_id)
+            user = request.user
+            
+            # Vérifier les permissions
+            if not (user.is_staff or 
+                   projet.chef_projet == user or 
+                   user in projet.membres.all()):
+                return Response(
+                    {'error': 'Accès non autorisé'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Récupérer les phases du projet
+            phases = Phase.objects.filter(projet=projet).order_by('ordre')
+            
+            # Calculer la progression du projet
+            total_phases = phases.count()
+            completed_phases = phases.filter(statut='TERMINEE').count()
+            in_progress_phases = phases.filter(statut='EN_COURS').count()
+            pending_phases = phases.filter(statut='EN_ATTENTE').count()
+            
+            progression = int((completed_phases / total_phases) * 100) if total_phases > 0 else 0
+            
+            # Statistiques des phases
+            stats = {
+                'total_phases': total_phases,
+                'completed_phases': completed_phases,
+                'in_progress_phases': in_progress_phases,
+                'pending_phases': pending_phases,
+                'progression': progression
+            }
+            
+            return Response({
+                'projet': {
+                    'id': projet.id,
+                    'nom': projet.nom,
+                    'statut': projet.statut
+                },
+                'statistiques': stats,
+                'phases': PhaseSerializer(phases, many=True).data
+            })
+            
+        except Projet.DoesNotExist:
+            return Response(
+                {'error': 'Projet non trouvé'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=True, methods=['post'])
+    def change_status(self, request, pk=None):
+        """Changer le statut d'une phase"""
+        phase = self.get_object()
+        new_status = request.data.get('statut')
+        
+        if not new_status or new_status not in dict(Phase.STATUT_CHOICES):
+            return Response(
+                {'error': 'Statut invalide'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        old_status = phase.statut
+        phase.statut = new_status
+        phase.save()
+        
+        # Enregistrer le changement de statut dans l'audit
+        try:
+            from .services import AuditService
+            AuditService.log_phase_status_change(
+                phase=phase,
+                user=request.user,
+                old_status=old_status,
+                new_status=new_status,
+                request=request
+            )
+        except Exception:
+            pass
+        
+        return Response({
+            'message': f'Statut de la phase changé de {old_status} à {new_status}',
+            'phase': PhaseSerializer(phase).data
+        })
+    
+    @action(detail=False, methods=['post'])
+    def reorder_phases(self, request):
+        """Réorganiser l'ordre des phases d'un projet"""
+        projet_id = request.data.get('projet_id')
+        phases_order = request.data.get('phases_order', [])
+        
+        if not projet_id or not phases_order:
+            return Response(
+                {'error': 'ID du projet et ordre des phases requis'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            projet = Projet.objects.get(id=projet_id)
+            user = request.user
+            
+            # Vérifier les permissions
+            if not (user.is_staff or 
+                   projet.chef_projet == user or 
+                   user in projet.membres.all()):
+                return Response(
+                    {'error': 'Accès non autorisé'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Mettre à jour l'ordre des phases
+            updated_phases = []
+            for phase_data in phases_order:
+                phase_id = phase_data.get('id')
+                new_order = phase_data.get('ordre')
+                
+                if phase_id and new_order is not None:
+                    try:
+                        phase = Phase.objects.get(id=phase_id, projet=projet)
+                        phase.ordre = new_order
+                        phase.save()
+                        updated_phases.append(phase)
+                    except Phase.DoesNotExist:
+                        continue
+            
+            # Enregistrer l'action dans l'audit
+            try:
+                from .services import AuditService
+                AuditService.log_action(
+                    action='UPDATE',
+                    user=user,
+                    resource=projet,
+                    description=f"Réorganisation de l'ordre des phases du projet '{projet.nom}'",
+                    projet=projet,
+                    request=request
+                )
+            except Exception:
+                pass
+            
+            return Response({
+                'message': f'{len(updated_phases)} phases réorganisées',
+                'phases': PhaseSerializer(updated_phases, many=True).data
+            })
+            
+        except Projet.DoesNotExist:
+            return Response(
+                {'error': 'Projet non trouvé'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class BudgetViewSet(viewsets.ModelViewSet):
     queryset = Budget.objects.all()

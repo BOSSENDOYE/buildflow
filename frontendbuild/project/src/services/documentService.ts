@@ -10,6 +10,37 @@ export interface Document {
   auteur?: number;
 }
 
+export interface DocumentVersion {
+  id: number;
+  document: number;
+  version: number;
+  fichier: string;
+  nom: string;
+  auteur: {
+    id: number;
+    username: string;
+    first_name: string;
+    last_name: string;
+  };
+  date_creation: string;
+  modifications?: string;
+  taille: number;
+}
+
+export interface DocumentComment {
+  id: number;
+  document: number;
+  auteur: {
+    id: number;
+    username: string;
+    first_name: string;
+    last_name: string;
+  };
+  contenu: string;
+  date_creation: string;
+  date_modification?: string;
+}
+
 export interface ProjectExport {
   projet: {
     id: number;
@@ -123,8 +154,8 @@ class DocumentService {
   }
 
   // Récupérer les documents d'un projet spécifique
-  async getProjectDocuments(projectId: number): Promise<{ projet: any; documents: Document[]; total_documents: number }> {
-    const response = await api.get(`/documents/projet/${projectId}/`);
+  async getProjectDocuments(projectId: number): Promise<{ projet: { id: number; nom: string }; documents: Document[]; total_documents: number }> {
+    const response = await api.get(`/documents/projet/${projectId}`);
     return response.data;
   }
 
@@ -259,6 +290,42 @@ class DocumentService {
   async getDocumentsByAuthor(authorId: number): Promise<Document[]> {
     const response = await api.get(`/documents/?auteur=${authorId}`);
     return response.data.results || response.data;
+  }
+
+  // Nouvelles méthodes pour versions et commentaires
+
+  // Récupérer les versions d'un document
+  async getDocumentVersions(documentId: number): Promise<DocumentVersion[]> {
+    const response = await api.get(`/documents/${documentId}/versions/`);
+    return response.data;
+  }
+
+  // Restaurer une version spécifique
+  async restoreDocumentVersion(documentId: number, versionId: number): Promise<void> {
+    await api.post(`/documents/${documentId}/versions/${versionId}/restore/`);
+  }
+
+  // Récupérer les commentaires d'un document
+  async getDocumentComments(documentId: number): Promise<DocumentComment[]> {
+    const response = await api.get(`/documents/${documentId}/comments/`);
+    return response.data;
+  }
+
+  // Ajouter un commentaire à un document
+  async addDocumentComment(documentId: number, content: string): Promise<DocumentComment> {
+    const response = await api.post(`/documents/${documentId}/comments/`, { contenu: content });
+    return response.data;
+  }
+
+  // Modifier un commentaire
+  async updateDocumentComment(documentId: number, commentId: number, content: string): Promise<DocumentComment> {
+    const response = await api.put(`/documents/${documentId}/comments/${commentId}/`, { contenu: content });
+    return response.data;
+  }
+
+  // Supprimer un commentaire
+  async deleteDocumentComment(documentId: number, commentId: number): Promise<void> {
+    await api.delete(`/documents/${documentId}/comments/${commentId}/`);
   }
 }
 

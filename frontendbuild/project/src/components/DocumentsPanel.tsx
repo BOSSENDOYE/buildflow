@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { 
   FileText, Upload, Download, Trash2, Eye, 
   Search, Filter, FolderOpen, Archive, 
-  Calendar, User, AlertCircle, ChevronDown
+  Calendar, User, AlertCircle, ChevronDown,
+  MessageSquare, History
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import projectService, { Project } from '../services/projectService';
 import documentService, { Document } from '../services/documentService';
 import DocumentUploadModal from './DocumentUploadModal';
+import DocumentPreviewModal from './DocumentPreviewModal';
+import DocumentComments from './DocumentComments';
+import DocumentVersionHistory from './DocumentVersionHistory';
 
 interface Props {
   project: Project | null;
@@ -15,6 +19,7 @@ interface Props {
 }
 
 const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects: initialAllProjects = [] }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user } = useAuth();
   const [selectedProject, setSelectedProject] = useState<Project | null>(initialProject);
   const [allProjects, setAllProjects] = useState<Project[]>(initialAllProjects);
@@ -25,9 +30,14 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showProjectSelector, setShowProjectSelector] = useState(false);
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
 
   const documentTypes = [
     { value: 'PLAN', label: 'Plan', icon: FileText, color: 'text-blue-600' },
@@ -52,8 +62,8 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
       const projects = Array.isArray(response) ? response : [];
       console.log('Projets chargés:', projects);
       setAllProjects(projects);
-    } catch (err) {
-      console.error('Erreur lors du chargement des projets:', err);
+    } catch (error) {
+      console.error('Erreur lors du chargement des projets:', error);
       setError("Impossible de charger la liste des projets.");
     } finally {
       setProjectsLoading(false);
@@ -68,7 +78,8 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
       setError('');
       const response = await documentService.getProjectDocuments(selectedProject.id);
       setDocuments(response.documents);
-    } catch (err) {
+    } catch (error) {
+      console.error('Erreur lors du chargement des documents:', error);
       setError("Impossible de charger les documents.");
     } finally {
       setLoading(false);
@@ -83,8 +94,9 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
       setError('');
       
       await documentService.downloadProjectExport(selectedProject.id, selectedProject.nom);
-    } catch (err) {
-      setError(`Erreur lors de l'export: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+    } catch (error) {
+      console.error('Erreur lors de l\'export:', error);
+      setError(`Erreur lors de l'export: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setExporting(false);
     }
@@ -101,7 +113,8 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
       
       // Recharger les documents
       await loadDocuments();
-    } catch (err) {
+    } catch (error) {
+      console.error('Erreur lors de l\'upload du document:', error);
       setError("Erreur lors de l'upload du document.");
     } finally {
       setUploading(false);
@@ -116,7 +129,8 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
       
       // Recharger les documents
       await loadDocuments();
-    } catch (err) {
+    } catch (error) {
+      console.error('Erreur lors de la suppression du document:', error);
       setError("Erreur lors de la suppression du document.");
     }
   };
@@ -126,7 +140,22 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
     setShowProjectSelector(false);
     setSearchTerm('');
     setFilterType('');
-    setError('');
+      setError('');
+  };
+
+  const handleOpenComments = (document: Document) => {
+    setSelectedDocument(document);
+    setIsCommentsOpen(true);
+  };
+
+  const handleOpenVersionHistory = (document: Document) => {
+    setSelectedDocument(document);
+    setIsVersionHistoryOpen(true);
+  };
+
+  const handleOpenPreview = (document: Document) => {
+    setSelectedDocument(document);
+    setIsPreviewOpen(true);
   };
 
   const filteredDocuments = documents.filter(doc => {
@@ -146,7 +175,7 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
     }
   };
 
-  const formatBudget = (budget: any) => {
+  const formatBudget = (budget: string | number | null | undefined) => {
     try {
       if (!budget) return 'N/A';
       const num = Number(budget);
@@ -248,7 +277,7 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
     <div className="space-y-6">
       {/* Sélecteur de projet */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="relative">
               <button
@@ -328,7 +357,7 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
         {/* Statistiques du projet */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
           <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">{selectedProject.phases?.length || 0}</div>
+            <div className="text-2xl font-bold text-blue-600">{(selectedProject as { phases?: unknown[] })?.phases?.length || 0}</div>
             <div className="text-sm text-blue-800">Phases</div>
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
@@ -373,13 +402,13 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
               {documentTypes.map(type => (
                 <option key={type.value} value={type.value}>{type.label}</option>
               ))}
-            </select>
+          </select>
             <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <Filter className="h-4 w-4 text-gray-600" />
             </button>
           </div>
         </div>
-      </div>
+        </div>
 
       {/* Liste des documents */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -427,16 +456,16 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
         {!loading && filteredDocuments.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
+          <thead className="bg-gray-50">
+            <tr>
                   <th className="text-left py-3 px-6 font-medium text-gray-900">Document</th>
                   <th className="text-left py-3 px-6 font-medium text-gray-900">Type</th>
                   <th className="text-left py-3 px-6 font-medium text-gray-900">Auteur</th>
                   <th className="text-left py-3 px-6 font-medium text-gray-900">Date</th>
                   <th className="text-left py-3 px-6 font-medium text-gray-900 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
                 {filteredDocuments.map((document) => {
                   const docType = documentTypes.find(t => t.value === document.type);
                   return (
@@ -473,9 +502,23 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
                       <td className="py-4 px-6">
                         <div className="flex items-center justify-center space-x-2">
                           <button
-                            onClick={() => safeOpenFile(document.fichier, document.nom)}
+                            onClick={() => handleOpenComments(document)}
+                            className="p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition-colors"
+                            title="Commentaires"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenVersionHistory(document)}
+                            className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
+                            title="Historique des versions"
+                          >
+                            <History className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenPreview(document)}
                             className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                            title="Voir le document"
+                            title="Prévisualiser"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -494,13 +537,13 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                </td>
+              </tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+          </tbody>
+        </table>
+      </div>
         )}
       </div>
 
@@ -511,6 +554,28 @@ const DocumentsPanel: React.FC<Props> = ({ project: initialProject, allProjects:
         onSubmit={handleUploadDocument}
         projectId={selectedProject.id}
         projectName={selectedProject.nom || 'Projet'}
+      />
+
+      {/* Modal des commentaires */}
+      <DocumentComments
+        documentId={selectedDocument?.id || 0}
+        isOpen={isCommentsOpen}
+        onClose={() => setIsCommentsOpen(false)}
+      />
+
+      {/* Modal de l'historique des versions */}
+      <DocumentVersionHistory
+        documentId={selectedDocument?.id || 0}
+        isOpen={isVersionHistoryOpen}
+        onClose={() => setIsVersionHistoryOpen(false)}
+      />
+
+      {/* Modal de prévisualisation */}
+      <DocumentPreviewModal
+        document={selectedDocument}
+        documents={documents}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
       />
     </div>
   );

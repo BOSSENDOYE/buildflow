@@ -31,6 +31,8 @@ export interface Phase {
   date_fin_reelle?: string;
   statut: 'EN_COURS' | 'TERMINEE' | 'EN_ATTENTE';
   ordre: number;
+  responsable?: string;
+  responsable_telephone?: string;
 }
 
 export interface Action {
@@ -111,6 +113,21 @@ class ProjectService {
     return response.data.results || response.data;
   }
 
+  async getProjectPhases(projectId: number): Promise<{
+    projet: { id: number; nom: string; statut: string };
+    statistiques: {
+      total_phases: number;
+      completed_phases: number;
+      in_progress_phases: number;
+      pending_phases: number;
+      progression: number;
+    };
+    phases: Phase[];
+  }> {
+    const response = await api.get(`/phases/project_phases/?projet_id=${projectId}`);
+    return response.data;
+  }
+
   async createPhase(phase: Partial<Phase>): Promise<Phase> {
     const response = await api.post('/phases/', phase);
     return response.data;
@@ -123,6 +140,27 @@ class ProjectService {
 
   async deletePhase(id: number): Promise<void> {
     await api.delete(`/phases/${id}/`);
+  }
+
+  async changePhaseStatus(phaseId: number, newStatus: string): Promise<{
+    message: string;
+    phase: Phase;
+  }> {
+    const response = await api.post(`/phases/${phaseId}/change_status/`, {
+      statut: newStatus
+    });
+    return response.data;
+  }
+
+  async reorderPhases(projectId: number, phasesOrder: Array<{ id: number; ordre: number }>): Promise<{
+    message: string;
+    phases: Phase[];
+  }> {
+    const response = await api.post('/phases/reorder_phases/', {
+      projet_id: projectId,
+      phases_order: phasesOrder
+    });
+    return response.data;
   }
 
   // Actions

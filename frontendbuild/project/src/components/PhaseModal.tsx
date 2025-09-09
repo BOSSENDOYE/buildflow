@@ -52,6 +52,8 @@ const PhaseModal: React.FC<PhaseModalProps> = ({
     };
   }, [isOpen, onClose]);
 
+
+
   const [formData, setFormData] = useState({
     nom: phase?.nom || '',
     description: phase?.description || '',
@@ -59,6 +61,8 @@ const PhaseModal: React.FC<PhaseModalProps> = ({
     date_fin_prevue: phase?.date_fin_prevue ? phase.date_fin_prevue.split('T')[0] : '',
     statut: phase?.statut || 'EN_ATTENTE',
     ordre: phase?.ordre || 0,
+    responsable: phase?.responsable || '',
+    responsable_telephone: phase?.responsable_telephone || '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -223,6 +227,47 @@ const PhaseModal: React.FC<PhaseModalProps> = ({
               </div>
             </div>
           </div>
+
+                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+             <h3 className="text-lg font-semibold text-gray-900 mb-4">👤 Responsable de la phase</h3>
+             <div className="space-y-4">
+               <div>
+                 <label className="block text-base font-medium text-gray-700 mb-2">
+                   Nom du responsable
+                 </label>
+                 <input
+                   type="text"
+                   name="responsable"
+                   value={formData.responsable}
+                   onChange={handleInputChange}
+                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                   placeholder="Ex: Jean Dupont, Marie Martin..."
+                   aria-label="Nom du responsable de la phase"
+                 />
+                 <p className="text-sm text-gray-600 mt-2">
+                   Entrez le nom de la personne responsable de cette phase
+                 </p>
+               </div>
+               
+               <div>
+                 <label className="block text-base font-medium text-gray-700 mb-2">
+                   Numéro de téléphone
+                 </label>
+                 <input
+                   type="tel"
+                   name="responsable_telephone"
+                   value={formData.responsable_telephone}
+                   onChange={handleInputChange}
+                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-colors"
+                   placeholder="+221 77 123 45 67"
+                   aria-label="Numéro de téléphone du responsable"
+                 />
+                 <p className="text-sm text-gray-600 mt-2">
+                   Entrez le numéro de téléphone du responsable (optionnel)
+                 </p>
+               </div>
+             </div>
+           </div>
 
           {error && (
             <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
